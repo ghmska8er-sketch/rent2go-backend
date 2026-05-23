@@ -9,6 +9,7 @@ import app.web.rtgtechnologies.rent2go.booking_reservations.domain.model.command
 import app.web.rtgtechnologies.rent2go.booking_reservations.domain.model.services.VehicleAvailabilityQueryService;
 import app.web.rtgtechnologies.rent2go.booking_reservations.domain.model.commands.UpdateReservationStatusCommand;
 import app.web.rtgtechnologies.rent2go.booking_reservations.domain.model.valueobjects.BookingStatus;
+import app.web.rtgtechnologies.rent2go.booking_reservations.domain.model.services.NotificationService;
 import lombok.AllArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -25,6 +26,7 @@ public class ReservationCommandServiceImpl implements ReservationCommandService 
 
     private final ReservationRepository reservationRepository;
     private final VehicleAvailabilityQueryService availabilityQueryService;
+    private final NotificationService notificationService;
 
     @Override
     public Reservation handle(CreateReservationCommand command) {
@@ -36,7 +38,13 @@ public class ReservationCommandServiceImpl implements ReservationCommandService 
             command.totalAmount()
         );
 
-        return reservationRepository.save(reservation);
+        var saved = reservationRepository.save(reservation);
+        try {
+            notificationService.notifyReservationCreated(saved.getId(), saved.getRenterId(), saved.getOwnerId());
+        } catch (Exception ex) {
+            // swallow notification errors; they must not break the booking flow
+        }
+        return saved;
     }
 
     @Override
@@ -48,7 +56,12 @@ public class ReservationCommandServiceImpl implements ReservationCommandService 
 
         var reservation = reservationOpt.get();
         reservation.cancel();
-        return reservationRepository.save(reservation);
+        var saved = reservationRepository.save(reservation);
+        try {
+            notificationService.notifyReservationCancelled(saved.getId(), "Cancelled by renter");
+        } catch (Exception ex) {
+        }
+        return saved;
     }
 
     @Override
@@ -103,6 +116,7 @@ public class ReservationCommandServiceImpl implements ReservationCommandService 
         }
 
         var t = target.toUpperCase().trim();
+        var previous = reservation.getStatus().getStatus();
         switch (t) {
             case "CONFIRMED" -> reservation.confirm();
             case "ACTIVE" -> reservation.activate();
@@ -111,6 +125,12 @@ public class ReservationCommandServiceImpl implements ReservationCommandService 
             default -> throw new IllegalArgumentException("Unsupported target status: " + target);
         }
 
-        return reservationRepository.save(reservation);
+        var saved = reservationRepository.save(reservation);
+        try {
+            notificationService.notifyReservationStatusChanged(saved.getId(), previous, saved.getStatus().getStatus());
+        } catch (Exception ex) {
+        }
+
+        return saved;
     }
 }

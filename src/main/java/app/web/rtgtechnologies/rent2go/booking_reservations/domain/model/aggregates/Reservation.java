@@ -56,6 +56,9 @@ public class Reservation extends AuditableAbstractAggregateRoot<Reservation> {
     @Column(name = "cancelled_at")
     private LocalDateTime cancelledAt;
 
+    @Column(name = "returned_at")
+    private LocalDateTime returnedAt;
+
     @Builder
     private Reservation(
         ReservationCode reservationCode,
@@ -126,6 +129,7 @@ public class Reservation extends AuditableAbstractAggregateRoot<Reservation> {
         }
 
         this.status = BookingStatus.COMPLETED();
+        this.returnedAt = LocalDateTime.now();
     }
 
     public void cancel() {

@@ -133,4 +133,32 @@ public class ReservationCommandServiceImpl implements ReservationCommandService 
 
         return saved;
     }
+
+    @Override
+    public Reservation handle(app.web.rtgtechnologies.rent2go.booking_reservations.domain.model.commands.ConfirmReturnCommand command) {
+        var reservationOpt = reservationRepository.findById(command.reservationId());
+        if (reservationOpt.isEmpty()) {
+            throw new IllegalArgumentException("Reservation not found: " + command.reservationId());
+        }
+
+        var reservation = reservationOpt.get();
+
+        // Only owner can confirm the return
+        if (!reservation.getOwnerId().equals(command.actorId())) {
+            throw new IllegalArgumentException("Actor is not authorized to confirm return");
+        }
+
+        if (!reservation.getStatus().isActive()) {
+            throw new IllegalStateException("Only active reservations can be completed on return confirmation");
+        }
+
+        reservation.complete();
+        var saved = reservationRepository.save(reservation);
+        try {
+            notificationService.notifyReservationStatusChanged(saved.getId(), "ACTIVE", "COMPLETED");
+        } catch (Exception ex) {
+        }
+
+        return saved;
+    }
 }

@@ -14,6 +14,8 @@ import app.web.rtgtechnologies.rent2go.booking_reservations.interfaces.rest.asse
 import app.web.rtgtechnologies.rent2go.booking_reservations.interfaces.rest.resources.ModifyReservationResource;
 import app.web.rtgtechnologies.rent2go.booking_reservations.interfaces.rest.assemblers.UpdateReservationStatusCommandFromResourceAssembler;
 import app.web.rtgtechnologies.rent2go.booking_reservations.interfaces.rest.resources.UpdateReservationStatusResource;
+import app.web.rtgtechnologies.rent2go.booking_reservations.interfaces.rest.assemblers.ConfirmReturnCommandFromResourceAssembler;
+import app.web.rtgtechnologies.rent2go.booking_reservations.interfaces.rest.resources.ConfirmReturnResource;
 import app.web.rtgtechnologies.rent2go.booking_reservations.domain.model.commands.CreateReservationCommand;
 import lombok.AllArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -34,6 +36,7 @@ public class ReservationController {
     private final CancelReservationCommandFromResourceAssembler cancelAssembler;
     private final ModifyReservationCommandFromResourceAssembler modifyAssembler;
     private final UpdateReservationStatusCommandFromResourceAssembler updateStatusAssembler;
+    private final ConfirmReturnCommandFromResourceAssembler confirmReturnAssembler;
 
     @PostMapping
     public ResponseEntity<ReservationResource> createReservation(@RequestBody CreateReservationResource resource) {
@@ -67,6 +70,13 @@ public class ReservationController {
     @PostMapping("/{id}/status")
     public ResponseEntity<ReservationResource> updateReservationStatus(@PathVariable Long id, @RequestBody UpdateReservationStatusResource resource) {
         var command = updateStatusAssembler.toCommand(id, resource);
+        var updated = commandService.handle(command);
+        return ResponseEntity.ok(resourceAssembler.toResource(updated));
+    }
+
+    @PostMapping("/{id}/confirm-return")
+    public ResponseEntity<ReservationResource> confirmReturn(@PathVariable Long id, @RequestBody ConfirmReturnResource resource) {
+        var command = confirmReturnAssembler.toCommand(id, resource);
         var updated = commandService.handle(command);
         return ResponseEntity.ok(resourceAssembler.toResource(updated));
     }

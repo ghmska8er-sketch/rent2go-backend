@@ -5,6 +5,7 @@ import app.web.rtgtechnologies.rent2go.payments.domain.model.entities.PromoCode;
 import app.web.rtgtechnologies.rent2go.payments.interfaces.rest.resources.CreatePromoRequest;
 import app.web.rtgtechnologies.rent2go.payments.interfaces.rest.resources.PromoCodeResource;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDateTime;
@@ -22,6 +23,7 @@ public class PromoCodeController {
     }
 
     @PostMapping
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<PromoCodeResource> create(@RequestBody CreatePromoRequest req) {
         if (req == null || req.getCode() == null || req.getPercentage() == null) return ResponseEntity.badRequest().build();
         LocalDateTime expires = null;
@@ -36,6 +38,7 @@ public class PromoCodeController {
     }
 
     @PatchMapping("/{code}/deactivate")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<Void> deactivate(@PathVariable String code) {
         boolean ok = promoService.deactivateByCode(code);
         return ok ? ResponseEntity.noContent().build() : ResponseEntity.notFound().build();

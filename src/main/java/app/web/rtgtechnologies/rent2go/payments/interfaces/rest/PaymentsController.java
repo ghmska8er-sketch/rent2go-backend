@@ -11,6 +11,7 @@ import app.web.rtgtechnologies.rent2go.payments.interfaces.rest.resources.FeeDto
 import app.web.rtgtechnologies.rent2go.payments.interfaces.rest.resources.MoneyResource;
 import lombok.AllArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.math.BigDecimal;
@@ -74,6 +75,7 @@ public class PaymentsController {
     }
 
     @PostMapping("/create-intent")
+    @PreAuthorize("hasRole('USER')")
     public ResponseEntity<CreateIntentResponse> createIntent(@RequestBody CreateIntentRequest request) {
         try {
             var map = stripePaymentService.createPaymentIntent(request.getReservationId(), request.getAmountCents(), request.getCurrency());
@@ -104,6 +106,7 @@ public class PaymentsController {
     }
 
     @PostMapping("/refund")
+    @PreAuthorize("hasRole('USER')")
     public ResponseEntity<String> refund(@RequestBody app.web.rtgtechnologies.rent2go.payments.interfaces.rest.resources.CreateIntentRequest request) {
         try {
             // use paymentIntent id from request.reservationId or amountCents as needed; here we expect amountCents and reservationId
@@ -120,6 +123,7 @@ public class PaymentsController {
     }
 
     @GetMapping("/reservations/{reservationId}/receipt")
+    @PreAuthorize("hasRole('USER')")
     public ResponseEntity<app.web.rtgtechnologies.rent2go.payments.interfaces.rest.resources.PaymentReceiptResource> getReceipt(@PathVariable Long reservationId) {
         var opt = paymentsService.findByReservationId(reservationId);
         if (opt.isEmpty()) return ResponseEntity.notFound().build();
@@ -135,6 +139,7 @@ public class PaymentsController {
     }
 
     @GetMapping("/owners/{ownerId}/earnings")
+    @PreAuthorize("hasAnyRole('OWNER','ADMIN')")
     public ResponseEntity<EarningsReportResource> getOwnerEarnings(
             @PathVariable Long ownerId,
             @RequestParam String from,

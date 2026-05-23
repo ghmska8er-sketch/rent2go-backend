@@ -75,12 +75,20 @@ public class WebSecurityConfiguration {
                 .exceptionHandling(exceptionHandling -> exceptionHandling.authenticationEntryPoint(unauthorizedRequestHandler))
                 .sessionManagement(customizer -> customizer.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(authorizeRequests -> authorizeRequests
-                    .requestMatchers(HttpMethod.POST, 
+                    .requestMatchers(HttpMethod.POST,
                         "/api/v1/auth/register",
-                        "/api/v1/auth/login").permitAll()
+                        "/api/v1/auth/login",
+                        "/api/v1/payments/calculate",
+                        "/api/v1/payments/webhook").permitAll()
+                    .requestMatchers(HttpMethod.GET,
+                        "/api/v1/vehicles/me").authenticated()
+                    .requestMatchers(HttpMethod.GET,
+                        "/api/v1/vehicles",
+                        "/api/v1/vehicles/*",
+                        "/api/v1/vehicles/*/images",
+                        "/api/v1/availability/vehicle/*/check",
+                        "/api/v1/payments/promocodes/*").permitAll()
                     .requestMatchers(
-                        "/api/v1/auth/**",
-                        "/api/v1/**",
                         "/v3/api-docs/**",
                         "/swagger-ui.html",
                         "/swagger-ui/**",

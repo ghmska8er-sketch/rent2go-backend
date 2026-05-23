@@ -105,8 +105,7 @@ public class VehicleQueryServiceImpl implements VehicleQueryService {
         // Filter by price range if provided
         if (criteria.hasPrice()) {
             results = results.stream()
-                .filter(v -> v.getDailyPrice().compareTo(criteria.getMinPrice()) >= 0 &&
-                           v.getDailyPrice().compareTo(criteria.getMaxPrice()) <= 0)
+                .filter(v -> matchesPrice(v, criteria))
                 .toList();
         }
 
@@ -136,5 +135,17 @@ public class VehicleQueryServiceImpl implements VehicleQueryService {
     @Override
     public List<Vehicle> getAllAvailableVehicles() {
         return vehicleRepository.findByStatus(VehicleStatus.AVAILABLE);
+    }
+
+    private boolean matchesPrice(Vehicle vehicle, SearchCriteria criteria) {
+        if (criteria.hasMinPrice() && vehicle.getDailyPrice().compareTo(criteria.getMinPrice()) < 0) {
+            return false;
+        }
+
+        if (criteria.hasMaxPrice() && vehicle.getDailyPrice().compareTo(criteria.getMaxPrice()) > 0) {
+            return false;
+        }
+
+        return true;
     }
 }

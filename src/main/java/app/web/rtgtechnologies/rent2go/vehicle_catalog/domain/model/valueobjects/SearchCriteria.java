@@ -90,7 +90,21 @@ public class SearchCriteria extends ValueObject {
      * Check if this criteria filters by price.
      */
     public boolean hasPrice() {
-        return minPrice != null && maxPrice != null;
+        return minPrice != null || maxPrice != null;
+    }
+
+    /**
+     * Check if this criteria filters by minimum price.
+     */
+    public boolean hasMinPrice() {
+        return minPrice != null;
+    }
+
+    /**
+     * Check if this criteria filters by maximum price.
+     */
+    public boolean hasMaxPrice() {
+        return maxPrice != null;
     }
 
     /**

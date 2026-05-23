@@ -91,9 +91,7 @@ public class Vehicle extends AuditableAbstractAggregateRoot<Vehicle> {
     }
 
     public void makeAvailable() {
-        if (this.status != VehicleStatus.RENTED && this.status != VehicleStatus.MAINTENANCE) {
-            this.status = VehicleStatus.AVAILABLE;
-        }
+        this.status = VehicleStatus.AVAILABLE;
     }
 
     public void markAsRented() {

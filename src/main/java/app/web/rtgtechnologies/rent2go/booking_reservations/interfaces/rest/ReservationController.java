@@ -101,4 +101,22 @@ public class ReservationController {
         var payload = results.stream().map(resourceAssembler::toResource).toList();
         return ResponseEntity.ok(payload);
     }
+
+    @GetMapping("/owner/paged")
+    public ResponseEntity<java.util.Map<String, Object>> listByOwnerPaged(
+            @RequestParam Long ownerId,
+            @RequestParam(required = false) String status,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size
+    ) {
+        var results = queryService.handle(new app.web.rtgtechnologies.rent2go.booking_reservations.domain.model.queries.GetReservationsByOwnerPagedQuery(ownerId, status, page, size));
+        var content = results.getContent().stream().map(resourceAssembler::toResource).toList();
+        var payload = new java.util.HashMap<String, Object>();
+        payload.put("content", content);
+        payload.put("page", results.getNumber());
+        payload.put("size", results.getSize());
+        payload.put("totalElements", results.getTotalElements());
+        payload.put("totalPages", results.getTotalPages());
+        return ResponseEntity.ok(payload);
+    }
 }

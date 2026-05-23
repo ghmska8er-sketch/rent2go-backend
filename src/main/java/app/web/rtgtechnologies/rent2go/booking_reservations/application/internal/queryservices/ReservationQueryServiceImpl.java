@@ -5,6 +5,9 @@ import app.web.rtgtechnologies.rent2go.booking_reservations.domain.model.queries
 import app.web.rtgtechnologies.rent2go.booking_reservations.domain.model.queries.GetReservationsByOwnerQuery;
 import app.web.rtgtechnologies.rent2go.booking_reservations.domain.model.queries.GetReservationsByRenterQuery;
 import app.web.rtgtechnologies.rent2go.booking_reservations.domain.model.queries.GetReservationHistoryByRenterQuery;
+import app.web.rtgtechnologies.rent2go.booking_reservations.domain.model.queries.GetReservationsByOwnerPagedQuery;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import app.web.rtgtechnologies.rent2go.booking_reservations.domain.model.services.ReservationQueryService;
 import app.web.rtgtechnologies.rent2go.booking_reservations.infrastructure.persistence.jpa.repositories.ReservationRepository;
 import lombok.AllArgsConstructor;
@@ -52,5 +55,15 @@ public class ReservationQueryServiceImpl implements ReservationQueryService {
     public java.util.List<Reservation> handle(GetReservationHistoryByRenterQuery query) {
         // For now history is defined as completed reservations for the renter
         return reservationRepository.findAllByRenterIdAndStatus_Status(query.renterId(), "COMPLETED");
+    }
+
+    @Override
+    public Page<Reservation> handle(GetReservationsByOwnerPagedQuery query) {
+        var p = PageRequest.of(Math.max(0, query.page()), Math.max(1, query.size()));
+        if (query.status() == null || query.status().isBlank()) {
+            return reservationRepository.findAllByOwnerId(query.ownerId(), p);
+        }
+
+        return reservationRepository.findAllByOwnerIdAndStatus_Status(query.ownerId(), query.status(), p);
     }
 }

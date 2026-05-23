@@ -2,6 +2,8 @@ package app.web.rtgtechnologies.rent2go.booking_reservations.application.interna
 
 import app.web.rtgtechnologies.rent2go.booking_reservations.domain.model.aggregates.Reservation;
 import app.web.rtgtechnologies.rent2go.booking_reservations.domain.model.queries.GetReservationByIdQuery;
+import app.web.rtgtechnologies.rent2go.booking_reservations.domain.model.queries.GetReservationsByOwnerQuery;
+import app.web.rtgtechnologies.rent2go.booking_reservations.domain.model.queries.GetReservationsByRenterQuery;
 import app.web.rtgtechnologies.rent2go.booking_reservations.domain.model.services.ReservationQueryService;
 import app.web.rtgtechnologies.rent2go.booking_reservations.infrastructure.persistence.jpa.repositories.ReservationRepository;
 import lombok.AllArgsConstructor;
@@ -25,5 +27,23 @@ public class ReservationQueryServiceImpl implements ReservationQueryService {
     @Override
     public Optional<Reservation> handle(GetReservationByIdQuery query) {
         return reservationRepository.findById(query.reservationId());
+    }
+
+    @Override
+    public java.util.List<Reservation> handle(GetReservationsByRenterQuery query) {
+        if (query.status() == null || query.status().isBlank()) {
+            return reservationRepository.findAllByRenterId(query.renterId());
+        }
+
+        return reservationRepository.findAllByRenterIdAndStatus_Status(query.renterId(), query.status());
+    }
+
+    @Override
+    public java.util.List<Reservation> handle(GetReservationsByOwnerQuery query) {
+        if (query.status() == null || query.status().isBlank()) {
+            return reservationRepository.findAllByOwnerId(query.ownerId());
+        }
+
+        return reservationRepository.findAllByOwnerIdAndStatus_Status(query.ownerId(), query.status());
     }
 }

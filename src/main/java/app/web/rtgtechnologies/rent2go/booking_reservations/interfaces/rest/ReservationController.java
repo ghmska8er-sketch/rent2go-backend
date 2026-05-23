@@ -40,4 +40,28 @@ public class ReservationController {
         return found.map(res -> ResponseEntity.ok(resourceAssembler.toResource(res)))
                 .orElseGet(() -> ResponseEntity.notFound().build());
     }
+
+    @GetMapping
+    public ResponseEntity<java.util.List<ReservationResource>> listByRenter(
+            @RequestParam(required = false) Long renterId,
+            @RequestParam(required = false) String status
+    ) {
+        if (renterId == null) {
+            return ResponseEntity.badRequest().build();
+        }
+
+        var results = queryService.handle(new app.web.rtgtechnologies.rent2go.booking_reservations.domain.model.queries.GetReservationsByRenterQuery(renterId, status));
+        var payload = results.stream().map(resourceAssembler::toResource).toList();
+        return ResponseEntity.ok(payload);
+    }
+
+    @GetMapping("/owner")
+    public ResponseEntity<java.util.List<ReservationResource>> listByOwner(
+            @RequestParam Long ownerId,
+            @RequestParam(required = false) String status
+    ) {
+        var results = queryService.handle(new app.web.rtgtechnologies.rent2go.booking_reservations.domain.model.queries.GetReservationsByOwnerQuery(ownerId, status));
+        var payload = results.stream().map(resourceAssembler::toResource).toList();
+        return ResponseEntity.ok(payload);
+    }
 }

@@ -6,6 +6,7 @@ import app.web.rtgtechnologies.rent2go.payments.domain.model.valueobjects.Fee;
 import app.web.rtgtechnologies.rent2go.payments.domain.model.valueobjects.Money;
 import app.web.rtgtechnologies.rent2go.payments.interfaces.rest.resources.CalculateFareRequest;
 import app.web.rtgtechnologies.rent2go.payments.interfaces.rest.resources.DiscountDto;
+import app.web.rtgtechnologies.rent2go.payments.interfaces.rest.resources.EarningsReportResource;
 import app.web.rtgtechnologies.rent2go.payments.interfaces.rest.resources.FeeDto;
 import app.web.rtgtechnologies.rent2go.payments.interfaces.rest.resources.MoneyResource;
 import lombok.AllArgsConstructor;
@@ -13,6 +14,9 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeParseException;
 import java.util.List;
 import java.util.stream.Collectors;
 import com.stripe.exception.StripeException;
@@ -128,5 +132,32 @@ public class PaymentsController {
         r.setCreatedAt(p.getCreatedAt());
         r.setUpdatedAt(p.getUpdatedAt());
         return ResponseEntity.ok(r);
+    }
+
+    @GetMapping("/owners/{ownerId}/earnings")
+    public ResponseEntity<EarningsReportResource> getOwnerEarnings(
+            @PathVariable Long ownerId,
+            @RequestParam String from,
+            @RequestParam String to) {
+        try {
+            var fromDate = LocalDate.parse(from).atStartOfDay();
+            var toDate = LocalDate.parse(to).atTime(23, 59, 59);
+            if (fromDate.isAfter(toDate)) {
+                return ResponseEntity.badRequest().build();
+            }
+
+            var totalCents = paymentsService.sumSucceededAmountCentsByOwnerBetween(ownerId, fromDate, toDate);
+            var paymentCount = paymentsService.countSucceededPaymentsByOwnerBetween(ownerId, fromDate, toDate);
+            var resource = new EarningsReportResource();
+            resource.setOwnerId(ownerId);
+            resource.setFrom(from);
+            resource.setTo(to);
+            resource.setCurrency("USD");
+            resource.setTotalAmountCents(totalCents != null ? totalCents : 0L);
+            resource.setPaymentsCount(paymentCount != null ? paymentCount : 0L);
+            return ResponseEntity.ok(resource);
+        } catch (DateTimeParseException ex) {
+            return ResponseEntity.badRequest().build();
+        }
     }
 }

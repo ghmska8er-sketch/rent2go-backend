@@ -43,4 +43,12 @@ public class PaymentsService {
             paymentRepository.save(p);
         });
     }
+
+    public Long sumSucceededAmountCentsByOwnerBetween(Long ownerId, java.time.LocalDateTime from, java.time.LocalDateTime to) {
+        return paymentRepository.sumSucceededAmountCentsByOwnerBetween(ownerId, from, to);
+    }
+
+    public Long countSucceededPaymentsByOwnerBetween(Long ownerId, java.time.LocalDateTime from, java.time.LocalDateTime to) {
+        return paymentRepository.countSucceededPaymentsByOwnerBetween(ownerId, from, to);
+    }
 }

@@ -30,6 +30,8 @@ public interface VehicleRepository extends JpaRepository<Vehicle, Long>, JpaSpec
 
     List<Vehicle> findByCategoryId(Long categoryId);
 
+    List<Vehicle> findByOwnerId(Long ownerId);
+
     @Query("SELECT v FROM Vehicle v WHERE v.status = :status AND v.dailyPrice BETWEEN :minPrice AND :maxPrice")
     List<Vehicle> findAvailableVehiclesByPriceRange(
         @Param("status") VehicleStatus status,

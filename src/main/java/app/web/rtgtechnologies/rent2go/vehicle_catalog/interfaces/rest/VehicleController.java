@@ -4,6 +4,7 @@ import app.web.rtgtechnologies.rent2go.vehicle_catalog.domain.model.aggregates.V
 import app.web.rtgtechnologies.rent2go.vehicle_catalog.domain.model.aggregates.VehicleImage;
 import app.web.rtgtechnologies.rent2go.vehicle_catalog.domain.model.queries.GetVehicleDetailsQuery;
 import app.web.rtgtechnologies.rent2go.vehicle_catalog.domain.model.queries.GetVehicleImagesQuery;
+import app.web.rtgtechnologies.rent2go.vehicle_catalog.domain.model.queries.GetVehiclesByOwnerQuery;
 import app.web.rtgtechnologies.rent2go.vehicle_catalog.domain.model.queries.SearchVehiclesByCriteriaQuery;
 import app.web.rtgtechnologies.rent2go.vehicle_catalog.domain.model.services.VehicleCommandService;
 import app.web.rtgtechnologies.rent2go.vehicle_catalog.domain.model.services.VehicleQueryService;
@@ -20,6 +21,7 @@ import app.web.rtgtechnologies.rent2go.vehicle_catalog.interfaces.rest.transform
 import app.web.rtgtechnologies.rent2go.vehicle_catalog.interfaces.rest.transform.UploadVehicleImageCommandFromResourceAssembler;
 import app.web.rtgtechnologies.rent2go.vehicle_catalog.interfaces.rest.transform.VehicleImageResourceFromEntityAssembler;
 import app.web.rtgtechnologies.rent2go.vehicle_catalog.interfaces.rest.transform.VehicleResourceFromEntityAssembler;
+import app.web.rtgtechnologies.rent2go.iam.infrastructure.services.JwtTokenProvider;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -51,6 +53,7 @@ public class VehicleController {
 
     private final VehicleCommandService vehicleCommandService;
     private final VehicleQueryService vehicleQueryService;
+    private final JwtTokenProvider jwtTokenProvider;
 
     /**
      * POST /api/v1/vehicles
@@ -58,12 +61,15 @@ public class VehicleController {
      * Register a new vehicle in the catalog.
      */
     @PostMapping
-    @Operation(summary = "Register a new vehicle")
+    @Operation(summary = "Publish a new vehicle with specifications")
     public ResponseEntity<VehicleResource> registerVehicle(
+        @RequestHeader(value = "Authorization", required = false) String authHeader,
         @RequestBody @Valid CreateVehicleResource request
     ) {
+        Long ownerId = extractUserIdFromAuthHeader(authHeader);
+
         // Convert resource to command using assembler
-        var command = CreateVehicleCommandFromResourceAssembler.toCommand(request);
+        var command = CreateVehicleCommandFromResourceAssembler.toCommand(ownerId, request);
 
         // Execute command
         Vehicle vehicle = vehicleCommandService.handle(command);
@@ -72,6 +78,26 @@ public class VehicleController {
         VehicleResource response = VehicleResourceFromEntityAssembler.toResource(vehicle);
 
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
+    }
+
+    /**
+     * GET /api/v1/vehicles/me
+     *
+     * Retrieve vehicles published by the authenticated owner.
+     */
+    @GetMapping("/me")
+    @Operation(summary = "Get my published vehicles")
+    public ResponseEntity<List<VehicleResource>> getMyVehicles(
+        @RequestHeader(value = "Authorization", required = false) String authHeader
+    ) {
+        Long ownerId = extractUserIdFromAuthHeader(authHeader);
+
+        List<Vehicle> vehicles = vehicleQueryService.handle(new GetVehiclesByOwnerQuery(ownerId));
+        List<VehicleResource> response = vehicles.stream()
+            .map(VehicleResourceFromEntityAssembler::toResource)
+            .collect(Collectors.toList());
+
+        return ResponseEntity.ok(response);
     }
 
     /**
@@ -234,5 +260,14 @@ public class VehicleController {
             .collect(Collectors.toList());
 
         return ResponseEntity.ok(response);
+    }
+
+    private Long extractUserIdFromAuthHeader(String authHeader) {
+        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+            throw new IllegalArgumentException("Authorization header with Bearer token is required");
+        }
+
+        String token = authHeader.substring(7);
+        return jwtTokenProvider.extractUserIdFromToken(token);
     }
 }

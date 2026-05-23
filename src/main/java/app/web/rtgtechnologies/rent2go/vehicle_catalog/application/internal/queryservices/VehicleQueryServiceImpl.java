@@ -5,6 +5,7 @@ import app.web.rtgtechnologies.rent2go.vehicle_catalog.domain.model.aggregates.V
 import app.web.rtgtechnologies.rent2go.vehicle_catalog.domain.model.queries.GetAvailableVehiclesQuery;
 import app.web.rtgtechnologies.rent2go.vehicle_catalog.domain.model.queries.GetVehicleDetailsQuery;
 import app.web.rtgtechnologies.rent2go.vehicle_catalog.domain.model.queries.GetVehicleImagesQuery;
+import app.web.rtgtechnologies.rent2go.vehicle_catalog.domain.model.queries.GetVehiclesByOwnerQuery;
 import app.web.rtgtechnologies.rent2go.vehicle_catalog.domain.model.queries.SearchVehiclesByCriteriaQuery;
 import app.web.rtgtechnologies.rent2go.vehicle_catalog.domain.model.services.VehicleQueryService;
 import app.web.rtgtechnologies.rent2go.vehicle_catalog.domain.model.valueobjects.SearchCriteria;
@@ -54,6 +55,19 @@ public class VehicleQueryServiceImpl implements VehicleQueryService {
         }
 
         return vehicleRepository.findByStatus(VehicleStatus.AVAILABLE);
+    }
+
+    /**
+     * Handle GetVehiclesByOwnerQuery
+     *
+     * Retrieves vehicles published by a specific owner.
+     *
+     * @param query GetVehiclesByOwnerQuery with owner ID
+     * @return List of Vehicle aggregates owned by the user
+     */
+    @Override
+    public List<Vehicle> handle(GetVehiclesByOwnerQuery query) {
+        return vehicleRepository.findByOwnerId(query.ownerId());
     }
 
     /**

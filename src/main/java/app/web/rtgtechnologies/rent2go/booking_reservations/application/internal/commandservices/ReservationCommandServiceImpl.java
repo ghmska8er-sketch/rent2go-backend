@@ -7,6 +7,8 @@ import app.web.rtgtechnologies.rent2go.booking_reservations.domain.model.valueob
 import app.web.rtgtechnologies.rent2go.booking_reservations.infrastructure.persistence.jpa.repositories.ReservationRepository;
 import app.web.rtgtechnologies.rent2go.booking_reservations.domain.model.commands.ModifyReservationCommand;
 import app.web.rtgtechnologies.rent2go.booking_reservations.domain.model.services.VehicleAvailabilityQueryService;
+import app.web.rtgtechnologies.rent2go.booking_reservations.domain.model.commands.UpdateReservationStatusCommand;
+import app.web.rtgtechnologies.rent2go.booking_reservations.domain.model.valueobjects.BookingStatus;
 import lombok.AllArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -78,6 +80,37 @@ public class ReservationCommandServiceImpl implements ReservationCommandService 
         }
 
         reservation.modify(newRange);
+        return reservationRepository.save(reservation);
+    }
+
+    @Override
+    public Reservation handle(UpdateReservationStatusCommand command) {
+        var reservationOpt = reservationRepository.findById(command.reservationId());
+        if (reservationOpt.isEmpty()) {
+            throw new IllegalArgumentException("Reservation not found: " + command.reservationId());
+        }
+
+        var reservation = reservationOpt.get();
+
+        // Authorization: only owner may change reservation lifecycle in this flow
+        if (!reservation.getOwnerId().equals(command.actorId())) {
+            throw new IllegalArgumentException("Actor is not authorized to change reservation status");
+        }
+
+        var target = command.status();
+        if (target == null) {
+            throw new IllegalArgumentException("Target status is required");
+        }
+
+        var t = target.toUpperCase().trim();
+        switch (t) {
+            case "CONFIRMED" -> reservation.confirm();
+            case "ACTIVE" -> reservation.activate();
+            case "COMPLETED" -> reservation.complete();
+            case "CANCELLED" -> reservation.cancel();
+            default -> throw new IllegalArgumentException("Unsupported target status: " + target);
+        }
+
         return reservationRepository.save(reservation);
     }
 }

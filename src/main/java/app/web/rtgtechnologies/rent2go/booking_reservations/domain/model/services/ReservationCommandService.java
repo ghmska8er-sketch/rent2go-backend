@@ -16,4 +16,6 @@ public interface ReservationCommandService {
     Reservation handle(CancelReservationCommand command);
     
     Reservation handle(app.web.rtgtechnologies.rent2go.booking_reservations.domain.model.commands.ModifyReservationCommand command);
+
+    Reservation handle(app.web.rtgtechnologies.rent2go.booking_reservations.domain.model.commands.UpdateReservationStatusCommand command);
 }

@@ -1,0 +1,43 @@
+package app.web.rtgtechnologies.rent2go.booking_reservations.interfaces.rest;
+
+import app.web.rtgtechnologies.rent2go.booking_reservations.application.internal.commandservices.ReservationCommandServiceImpl;
+import app.web.rtgtechnologies.rent2go.booking_reservations.application.internal.queryservices.ReservationQueryServiceImpl;
+import app.web.rtgtechnologies.rent2go.booking_reservations.domain.model.queries.GetReservationByIdQuery;
+import app.web.rtgtechnologies.rent2go.booking_reservations.domain.model.aggregates.Reservation;
+import app.web.rtgtechnologies.rent2go.booking_reservations.interfaces.rest.resources.CreateReservationResource;
+import app.web.rtgtechnologies.rent2go.booking_reservations.interfaces.rest.resources.ReservationResource;
+import app.web.rtgtechnologies.rent2go.booking_reservations.interfaces.rest.assemblers.CreateReservationCommandFromResourceAssembler;
+import app.web.rtgtechnologies.rent2go.booking_reservations.interfaces.rest.assemblers.ReservationResourceFromEntityAssembler;
+import app.web.rtgtechnologies.rent2go.booking_reservations.domain.model.commands.CreateReservationCommand;
+import lombok.AllArgsConstructor;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+
+import java.net.URI;
+import java.util.Optional;
+
+@RestController
+@RequestMapping("/api/v1/reservations")
+@AllArgsConstructor
+public class ReservationController {
+
+    private final ReservationCommandServiceImpl commandService;
+    private final ReservationQueryServiceImpl queryService;
+    private final CreateReservationCommandFromResourceAssembler commandAssembler;
+    private final ReservationResourceFromEntityAssembler resourceAssembler;
+
+    @PostMapping
+    public ResponseEntity<ReservationResource> createReservation(@RequestBody CreateReservationResource resource) {
+        CreateReservationCommand command = commandAssembler.toCommand(resource);
+        Reservation saved = commandService.handle(command);
+        ReservationResource resp = resourceAssembler.toResource(saved);
+        return ResponseEntity.created(URI.create("/api/v1/reservations/" + saved.getId())).body(resp);
+    }
+
+    @GetMapping("/{id}")
+    public ResponseEntity<ReservationResource> getReservationById(@PathVariable Long id) {
+        Optional<Reservation> found = queryService.handle(new GetReservationByIdQuery(id));
+        return found.map(res -> ResponseEntity.ok(resourceAssembler.toResource(res)))
+                .orElseGet(() -> ResponseEntity.notFound().build());
+    }
+}

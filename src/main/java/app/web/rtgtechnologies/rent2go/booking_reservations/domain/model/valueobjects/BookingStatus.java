@@ -1,6 +1,8 @@
 package app.web.rtgtechnologies.rent2go.booking_reservations.domain.model.valueobjects;
 
 import app.web.rtgtechnologies.rent2go.shared.domain.ValueObject;
+import jakarta.persistence.Column;
+import jakarta.persistence.Embeddable;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -20,8 +22,10 @@ import java.util.Objects;
 @Getter
 @NoArgsConstructor
 @AllArgsConstructor
+@Embeddable
 public class BookingStatus extends ValueObject {
 
+    @Column(name = "status", nullable = false, length = 20)
     private String status;
 
     public static BookingStatus PENDING() {
@@ -54,6 +58,18 @@ public class BookingStatus extends ValueObject {
 
     public boolean isActive() {
         return "ACTIVE".equals(this.status);
+    }
+
+    public boolean isCompleted() {
+        return "COMPLETED".equals(this.status);
+    }
+
+    public boolean isCancelled() {
+        return "CANCELLED".equals(this.status);
+    }
+
+    public boolean isTerminal() {
+        return isCompleted() || isCancelled();
     }
 
     @Override

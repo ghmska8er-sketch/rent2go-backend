@@ -33,4 +33,16 @@ public class ReservationCommandServiceImpl implements ReservationCommandService 
 
         return reservationRepository.save(reservation);
     }
+
+    @Override
+    public Reservation handle(app.web.rtgtechnologies.rent2go.booking_reservations.domain.model.commands.CancelReservationCommand command) {
+        var reservationOpt = reservationRepository.findById(command.reservationId());
+        if (reservationOpt.isEmpty()) {
+            throw new IllegalArgumentException("Reservation not found: " + command.reservationId());
+        }
+
+        var reservation = reservationOpt.get();
+        reservation.cancel();
+        return reservationRepository.save(reservation);
+    }
 }

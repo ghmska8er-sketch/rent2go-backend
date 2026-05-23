@@ -8,6 +8,8 @@ import app.web.rtgtechnologies.rent2go.booking_reservations.interfaces.rest.reso
 import app.web.rtgtechnologies.rent2go.booking_reservations.interfaces.rest.resources.ReservationResource;
 import app.web.rtgtechnologies.rent2go.booking_reservations.interfaces.rest.assemblers.CreateReservationCommandFromResourceAssembler;
 import app.web.rtgtechnologies.rent2go.booking_reservations.interfaces.rest.assemblers.ReservationResourceFromEntityAssembler;
+import app.web.rtgtechnologies.rent2go.booking_reservations.interfaces.rest.assemblers.CancelReservationCommandFromResourceAssembler;
+import app.web.rtgtechnologies.rent2go.booking_reservations.interfaces.rest.resources.CancelReservationResource;
 import app.web.rtgtechnologies.rent2go.booking_reservations.domain.model.commands.CreateReservationCommand;
 import lombok.AllArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -25,6 +27,7 @@ public class ReservationController {
     private final ReservationQueryServiceImpl queryService;
     private final CreateReservationCommandFromResourceAssembler commandAssembler;
     private final ReservationResourceFromEntityAssembler resourceAssembler;
+    private final CancelReservationCommandFromResourceAssembler cancelAssembler;
 
     @PostMapping
     public ResponseEntity<ReservationResource> createReservation(@RequestBody CreateReservationResource resource) {
@@ -39,6 +42,13 @@ public class ReservationController {
         Optional<Reservation> found = queryService.handle(new GetReservationByIdQuery(id));
         return found.map(res -> ResponseEntity.ok(resourceAssembler.toResource(res)))
                 .orElseGet(() -> ResponseEntity.notFound().build());
+    }
+
+    @PostMapping("/{id}/cancel")
+    public ResponseEntity<ReservationResource> cancelReservation(@PathVariable Long id, @RequestBody CancelReservationResource resource) {
+        var command = cancelAssembler.toCommand(id, resource);
+        var canceled = commandService.handle(command);
+        return ResponseEntity.ok(resourceAssembler.toResource(canceled));
     }
 
     @GetMapping

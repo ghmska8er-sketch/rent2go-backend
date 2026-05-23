@@ -11,6 +11,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import app.web.rtgtechnologies.rent2go.booking_reservations.infrastructure.persistence.jpa.repositories.ReservationRepository;
+
+import java.util.Optional;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -25,6 +28,16 @@ public class StripePaymentService {
 
     @Value("${stripe.webhook-secret:}")
     private String stripeWebhookSecret;
+
+    private final ReservationRepository reservationRepository;
+
+    // Inject PaymentsService to update payment records
+    private final app.web.rtgtechnologies.rent2go.payments.application.internal.services.PaymentsService paymentsService;
+
+    public StripePaymentService(ReservationRepository reservationRepository, app.web.rtgtechnologies.rent2go.payments.application.internal.services.PaymentsService paymentsService) {
+        this.reservationRepository = reservationRepository;
+        this.paymentsService = paymentsService;
+    }
 
     public Map<String, Object> createPaymentIntent(Long reservationId, Long amountCents, String currency) throws StripeException {
         Stripe.apiKey = stripeSecretKey;
@@ -53,10 +66,36 @@ public class StripePaymentService {
                 PaymentIntent intent = (PaymentIntent) event.getDataObjectDeserializer().getObject().orElse(null);
                 if (intent != null) {
                     log.info("PaymentIntent succeeded: {} metadata: {}", intent.getId(), intent.getMetadata());
+                    try {
+                        String reservationIdStr = intent.getMetadata().get("reservationId");
+                        if (reservationIdStr != null && !reservationIdStr.isBlank()) {
+                            Long reservationId = Long.valueOf(reservationIdStr);
+                            Optional<app.web.rtgtechnologies.rent2go.booking_reservations.domain.model.aggregates.Reservation> resOpt = reservationRepository.findById(reservationId);
+                            if (resOpt.isPresent()) {
+                                var reservation = resOpt.get();
+                                reservation.markPaid(intent.getId());
+                                reservationRepository.save(reservation);
+                                log.info("Reservation {} marked as paid (intent={})", reservationId, intent.getId());
+                            } else {
+                                log.warn("Reservation metadata points to non-existent id: {}", reservationId);
+                            }
+                        }
+                    } catch (Exception ex) {
+                        log.error("Error handling payment_intent.succeeded webhook: {}", ex.getMessage(), ex);
+                    }
                 }
             }
             case "charge.refunded" -> log.info("Charge refunded event received: {}", event.getData());
             default -> log.info("Unhandled event type: {}", event.getType());
         }
+    }
+
+    public String refundPayment(String paymentIntentId, Long amountCents) throws StripeException {
+        Stripe.apiKey = stripeSecretKey;
+        com.stripe.param.RefundCreateParams.Builder b = com.stripe.param.RefundCreateParams.builder();
+        if (amountCents != null) b.setAmount(amountCents);
+        b.setPaymentIntent(paymentIntentId);
+        com.stripe.model.Refund r = com.stripe.model.Refund.create(b.build());
+        return r.getId();
     }
 }

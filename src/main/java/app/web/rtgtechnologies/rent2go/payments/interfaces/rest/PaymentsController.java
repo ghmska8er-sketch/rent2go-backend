@@ -31,6 +31,7 @@ public class PaymentsController {
 
     private final FareCalculationServiceImpl fareCalculationService;
     private final StripePaymentService stripePaymentService;
+    private final app.web.rtgtechnologies.rent2go.payments.application.internal.services.PaymentsService paymentsService;
 
     @Value("${stripe.webhook-secret:}")
     private String stripeWebhookSecret;
@@ -60,6 +61,8 @@ public class PaymentsController {
     public ResponseEntity<CreateIntentResponse> createIntent(@RequestBody CreateIntentRequest request) {
         try {
             var map = stripePaymentService.createPaymentIntent(request.getReservationId(), request.getAmountCents(), request.getCurrency());
+            // persist payment record
+            paymentsService.createRecord(request.getReservationId(), (String) map.get("id"), request.getAmountCents(), request.getCurrency());
             return ResponseEntity.ok(new CreateIntentResponse((String) map.get("clientSecret"), (String) map.get("id")));
         } catch (StripeException e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
@@ -71,9 +74,47 @@ public class PaymentsController {
         try {
             var event = stripePaymentService.constructEvent(payload, sigHeader);
             stripePaymentService.handleWebhookEvent(event);
+            // mark payment record succeeded when applicable
+            if ("payment_intent.succeeded".equals(event.getType())) {
+                var pi = (com.stripe.model.PaymentIntent) event.getDataObjectDeserializer().getObject().orElse(null);
+                if (pi != null) {
+                    paymentsService.markSucceeded(pi.getId());
+                }
+            }
             return ResponseEntity.ok("received");
         } catch (Exception ex) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("invalid payload");
         }
+    }
+
+    @PostMapping("/refund")
+    public ResponseEntity<String> refund(@RequestBody app.web.rtgtechnologies.rent2go.payments.interfaces.rest.resources.CreateIntentRequest request) {
+        try {
+            // use paymentIntent id from request.reservationId or amountCents as needed; here we expect amountCents and reservationId
+            // Find payment record by reservation
+            var opt = paymentsService.findByReservationId(request.getReservationId());
+            if (opt.isEmpty()) return ResponseEntity.notFound().build();
+            var payment = opt.get();
+            var refundId = stripePaymentService.refundPayment(payment.getPaymentIntentId(), request.getAmountCents());
+            paymentsService.markRefunded(payment.getPaymentIntentId());
+            return ResponseEntity.ok(refundId);
+        } catch (Exception ex) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("error");
+        }
+    }
+
+    @GetMapping("/reservations/{reservationId}/receipt")
+    public ResponseEntity<app.web.rtgtechnologies.rent2go.payments.interfaces.rest.resources.PaymentReceiptResource> getReceipt(@PathVariable Long reservationId) {
+        var opt = paymentsService.findByReservationId(reservationId);
+        if (opt.isEmpty()) return ResponseEntity.notFound().build();
+        var p = opt.get();
+        var r = new app.web.rtgtechnologies.rent2go.payments.interfaces.rest.resources.PaymentReceiptResource();
+        r.setPaymentIntentId(p.getPaymentIntentId());
+        r.setAmountCents(p.getAmountCents());
+        r.setCurrency(p.getCurrency());
+        r.setStatus(p.getStatus());
+        r.setCreatedAt(p.getCreatedAt());
+        r.setUpdatedAt(p.getUpdatedAt());
+        return ResponseEntity.ok(r);
     }
 }

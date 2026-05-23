@@ -2,11 +2,13 @@ package app.web.rtgtechnologies.rent2go.vehicle_catalog.interfaces.rest;
 
 import app.web.rtgtechnologies.rent2go.vehicle_catalog.domain.model.aggregates.Vehicle;
 import app.web.rtgtechnologies.rent2go.vehicle_catalog.domain.model.aggregates.VehicleImage;
-import app.web.rtgtechnologies.rent2go.vehicle_catalog.domain.model.queries.GetAvailableVehiclesQuery;
 import app.web.rtgtechnologies.rent2go.vehicle_catalog.domain.model.queries.GetVehicleDetailsQuery;
 import app.web.rtgtechnologies.rent2go.vehicle_catalog.domain.model.queries.GetVehicleImagesQuery;
+import app.web.rtgtechnologies.rent2go.vehicle_catalog.domain.model.queries.GetVehiclesByOwnerQuery;
+import app.web.rtgtechnologies.rent2go.vehicle_catalog.domain.model.queries.SearchVehiclesByCriteriaQuery;
 import app.web.rtgtechnologies.rent2go.vehicle_catalog.domain.model.services.VehicleCommandService;
 import app.web.rtgtechnologies.rent2go.vehicle_catalog.domain.model.services.VehicleQueryService;
+import app.web.rtgtechnologies.rent2go.vehicle_catalog.domain.model.valueobjects.SearchCriteria;
 import app.web.rtgtechnologies.rent2go.vehicle_catalog.interfaces.rest.resources.CreateVehicleResource;
 import app.web.rtgtechnologies.rent2go.vehicle_catalog.interfaces.rest.resources.UpdateVehicleDetailsResource;
 import app.web.rtgtechnologies.rent2go.vehicle_catalog.interfaces.rest.resources.UpdateVehiclePricingResource;
@@ -19,14 +21,17 @@ import app.web.rtgtechnologies.rent2go.vehicle_catalog.interfaces.rest.transform
 import app.web.rtgtechnologies.rent2go.vehicle_catalog.interfaces.rest.transform.UploadVehicleImageCommandFromResourceAssembler;
 import app.web.rtgtechnologies.rent2go.vehicle_catalog.interfaces.rest.transform.VehicleImageResourceFromEntityAssembler;
 import app.web.rtgtechnologies.rent2go.vehicle_catalog.interfaces.rest.transform.VehicleResourceFromEntityAssembler;
+import app.web.rtgtechnologies.rent2go.iam.infrastructure.services.JwtTokenProvider;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import lombok.AllArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -48,6 +53,7 @@ public class VehicleController {
 
     private final VehicleCommandService vehicleCommandService;
     private final VehicleQueryService vehicleQueryService;
+    private final JwtTokenProvider jwtTokenProvider;
 
     /**
      * POST /api/v1/vehicles
@@ -55,12 +61,15 @@ public class VehicleController {
      * Register a new vehicle in the catalog.
      */
     @PostMapping
-    @Operation(summary = "Register a new vehicle")
+    @Operation(summary = "Publish a new vehicle with specifications")
     public ResponseEntity<VehicleResource> registerVehicle(
-        @RequestBody CreateVehicleResource request
+        @RequestHeader(value = "Authorization", required = false) String authHeader,
+        @RequestBody @Valid CreateVehicleResource request
     ) {
+        Long ownerId = extractUserIdFromAuthHeader(authHeader);
+
         // Convert resource to command using assembler
-        var command = CreateVehicleCommandFromResourceAssembler.toCommand(request);
+        var command = CreateVehicleCommandFromResourceAssembler.toCommand(ownerId, request);
 
         // Execute command
         Vehicle vehicle = vehicleCommandService.handle(command);
@@ -69,6 +78,26 @@ public class VehicleController {
         VehicleResource response = VehicleResourceFromEntityAssembler.toResource(vehicle);
 
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
+    }
+
+    /**
+     * GET /api/v1/vehicles/me
+     *
+     * Retrieve vehicles published by the authenticated owner.
+     */
+    @GetMapping("/me")
+    @Operation(summary = "Get my published vehicles")
+    public ResponseEntity<List<VehicleResource>> getMyVehicles(
+        @RequestHeader(value = "Authorization", required = false) String authHeader
+    ) {
+        Long ownerId = extractUserIdFromAuthHeader(authHeader);
+
+        List<Vehicle> vehicles = vehicleQueryService.handle(new GetVehiclesByOwnerQuery(ownerId));
+        List<VehicleResource> response = vehicles.stream()
+            .map(VehicleResourceFromEntityAssembler::toResource)
+            .collect(Collectors.toList());
+
+        return ResponseEntity.ok(response);
     }
 
     /**
@@ -96,18 +125,28 @@ public class VehicleController {
     @Operation(summary = "Search available vehicles")
     public ResponseEntity<List<VehicleResource>> searchAvailableVehicles(
         @RequestParam(required = false) List<String> categories,
-        @RequestParam(required = false) Double minPrice,
-        @RequestParam(required = false) Double maxPrice,
+        @RequestParam(required = false) BigDecimal minPrice,
+        @RequestParam(required = false) BigDecimal maxPrice,
+        @RequestParam(required = false) Integer minYear,
+        @RequestParam(required = false) Integer maxYear,
+        @RequestParam(required = false) Integer seats,
+        @RequestParam(required = false) String transmission,
+        @RequestParam(required = false) String fuelType,
         @RequestParam(required = false) String location
     ) {
-        GetAvailableVehiclesQuery query = new GetAvailableVehiclesQuery(
+        SearchCriteria criteria = SearchCriteria.full(
             categories,
             minPrice,
             maxPrice,
+            minYear,
+            maxYear,
+            seats,
+            transmission,
+            fuelType,
             location
         );
 
-        List<Vehicle> vehicles = vehicleQueryService.handle(query);
+        List<Vehicle> vehicles = vehicleQueryService.handle(new SearchVehiclesByCriteriaQuery(criteria));
         List<VehicleResource> response = vehicles.stream()
             .map(VehicleResourceFromEntityAssembler::toResource)
             .collect(Collectors.toList());
@@ -124,10 +163,10 @@ public class VehicleController {
     @Operation(summary = "Update vehicle pricing")
     public ResponseEntity<VehicleResource> updateVehiclePrice(
         @PathVariable Long id,
-        @RequestBody UpdateVehiclePricingResource request
+        @RequestBody @Valid UpdateVehiclePricingResource request
     ) {
         // Convert resource to command using assembler
-        var command = UpdateVehiclePricingCommandFromResourceAssembler.toCommand(request);
+        var command = UpdateVehiclePricingCommandFromResourceAssembler.toCommand(id, request);
 
         // Execute command
         Vehicle vehicle = vehicleCommandService.handle(command);
@@ -147,7 +186,7 @@ public class VehicleController {
     @Operation(summary = "Update vehicle details")
     public ResponseEntity<VehicleResource> updateVehicleDetails(
         @PathVariable Long id,
-        @RequestBody UpdateVehicleDetailsResource request
+        @RequestBody @Valid UpdateVehicleDetailsResource request
     ) {
         var command = UpdateVehicleDetailsCommandFromResourceAssembler.toCommand(id, request);
         Vehicle vehicle = vehicleCommandService.handle(command);
@@ -164,7 +203,7 @@ public class VehicleController {
     @Operation(summary = "Upload a vehicle image")
     public ResponseEntity<VehicleResource> uploadVehicleImage(
         @PathVariable Long id,
-        @RequestBody UploadVehicleImageResource request
+        @RequestBody @Valid UploadVehicleImageResource request
     ) {
         var command = UploadVehicleImageCommandFromResourceAssembler.toCommand(id, request);
         Vehicle vehicle = vehicleCommandService.handle(command);
@@ -231,5 +270,14 @@ public class VehicleController {
             .collect(Collectors.toList());
 
         return ResponseEntity.ok(response);
+    }
+
+    private Long extractUserIdFromAuthHeader(String authHeader) {
+        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+            throw new IllegalArgumentException("Authorization header with Bearer token is required");
+        }
+
+        String token = authHeader.substring(7);
+        return jwtTokenProvider.extractUserIdFromToken(token);
     }
 }

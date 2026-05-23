@@ -76,6 +76,7 @@ public class VehicleCommandServiceImpl implements VehicleCommandService {
 
         // Create vehicle aggregate
         Vehicle vehicle = Vehicle.builder()
+            .ownerId(command.ownerId())
             .licensePlate(command.licensePlate())
             .make(command.make())
             .model(command.model())

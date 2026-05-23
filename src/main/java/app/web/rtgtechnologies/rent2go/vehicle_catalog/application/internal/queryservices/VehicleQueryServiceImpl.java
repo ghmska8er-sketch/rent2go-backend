@@ -5,6 +5,7 @@ import app.web.rtgtechnologies.rent2go.vehicle_catalog.domain.model.aggregates.V
 import app.web.rtgtechnologies.rent2go.vehicle_catalog.domain.model.queries.GetAvailableVehiclesQuery;
 import app.web.rtgtechnologies.rent2go.vehicle_catalog.domain.model.queries.GetVehicleDetailsQuery;
 import app.web.rtgtechnologies.rent2go.vehicle_catalog.domain.model.queries.GetVehicleImagesQuery;
+import app.web.rtgtechnologies.rent2go.vehicle_catalog.domain.model.queries.GetVehiclesByOwnerQuery;
 import app.web.rtgtechnologies.rent2go.vehicle_catalog.domain.model.queries.SearchVehiclesByCriteriaQuery;
 import app.web.rtgtechnologies.rent2go.vehicle_catalog.domain.model.services.VehicleQueryService;
 import app.web.rtgtechnologies.rent2go.vehicle_catalog.domain.model.valueobjects.SearchCriteria;
@@ -57,6 +58,19 @@ public class VehicleQueryServiceImpl implements VehicleQueryService {
     }
 
     /**
+     * Handle GetVehiclesByOwnerQuery
+     *
+     * Retrieves vehicles published by a specific owner.
+     *
+     * @param query GetVehiclesByOwnerQuery with owner ID
+     * @return List of Vehicle aggregates owned by the user
+     */
+    @Override
+    public List<Vehicle> handle(GetVehiclesByOwnerQuery query) {
+        return vehicleRepository.findByOwnerId(query.ownerId());
+    }
+
+    /**
      * Handle GetVehicleDetailsQuery
      *
      * Retrieves detailed information about a specific vehicle.
@@ -105,8 +119,7 @@ public class VehicleQueryServiceImpl implements VehicleQueryService {
         // Filter by price range if provided
         if (criteria.hasPrice()) {
             results = results.stream()
-                .filter(v -> v.getDailyPrice().compareTo(criteria.getMinPrice()) >= 0 &&
-                           v.getDailyPrice().compareTo(criteria.getMaxPrice()) <= 0)
+                .filter(v -> matchesPrice(v, criteria))
                 .toList();
         }
 
@@ -125,6 +138,34 @@ public class VehicleQueryServiceImpl implements VehicleQueryService {
                 .toList();
         }
 
+        // Filter by year range if provided
+        if (criteria.hasYearRange()) {
+            results = results.stream()
+                .filter(v -> matchesYear(v, criteria))
+                .toList();
+        }
+
+        // Filter by seats if provided
+        if (criteria.hasSeats()) {
+            results = results.stream()
+                .filter(v -> v.getSeats() != null && v.getSeats().equals(criteria.getSeats()))
+                .toList();
+        }
+
+        // Filter by transmission if provided
+        if (criteria.hasTransmission()) {
+            results = results.stream()
+                .filter(v -> v.getTransmission() != null && v.getTransmission().equalsIgnoreCase(criteria.getTransmission()))
+                .toList();
+        }
+
+        // Filter by fuel type if provided
+        if (criteria.hasFuelType()) {
+            results = results.stream()
+                .filter(v -> v.getFuelType() != null && v.getFuelType().equalsIgnoreCase(criteria.getFuelType()))
+                .toList();
+        }
+
         return results;
     }
 
@@ -136,5 +177,29 @@ public class VehicleQueryServiceImpl implements VehicleQueryService {
     @Override
     public List<Vehicle> getAllAvailableVehicles() {
         return vehicleRepository.findByStatus(VehicleStatus.AVAILABLE);
+    }
+
+    private boolean matchesPrice(Vehicle vehicle, SearchCriteria criteria) {
+        if (criteria.hasMinPrice() && vehicle.getDailyPrice().compareTo(criteria.getMinPrice()) < 0) {
+            return false;
+        }
+
+        if (criteria.hasMaxPrice() && vehicle.getDailyPrice().compareTo(criteria.getMaxPrice()) > 0) {
+            return false;
+        }
+
+        return true;
+    }
+
+    private boolean matchesYear(Vehicle vehicle, SearchCriteria criteria) {
+        if (criteria.getMinYear() != null && vehicle.getYear() < criteria.getMinYear()) {
+            return false;
+        }
+
+        if (criteria.getMaxYear() != null && vehicle.getYear() > criteria.getMaxYear()) {
+            return false;
+        }
+
+        return true;
     }
 }

@@ -19,8 +19,9 @@ public final class CreateVehicleCommandFromResourceAssembler {
      * @param resource CreateVehicleResource from HTTP layer
      * @return RegisterVehicleCommand for domain layer
      */
-    public static RegisterVehicleCommand toCommand(CreateVehicleResource resource) {
+    public static RegisterVehicleCommand toCommand(Long ownerId, CreateVehicleResource resource) {
         return new RegisterVehicleCommand(
+            ownerId,
             resource.getLicensePlate(),
             resource.getMake(),
             resource.getModel(),

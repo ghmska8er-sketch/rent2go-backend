@@ -48,6 +48,9 @@ public class Vehicle extends AuditableAbstractAggregateRoot<Vehicle> {
     @Column(unique = true, nullable = false, length = 50)
     private String vin;
 
+    @Column(name = "owner_id")
+    private Long ownerId;
+
     @Column(nullable = false, length = 15)
     @Enumerated(EnumType.STRING)
     private VehicleStatus status;
@@ -91,9 +94,7 @@ public class Vehicle extends AuditableAbstractAggregateRoot<Vehicle> {
     }
 
     public void makeAvailable() {
-        if (this.status != VehicleStatus.RENTED && this.status != VehicleStatus.MAINTENANCE) {
-            this.status = VehicleStatus.AVAILABLE;
-        }
+        this.status = VehicleStatus.AVAILABLE;
     }
 
     public void markAsRented() {

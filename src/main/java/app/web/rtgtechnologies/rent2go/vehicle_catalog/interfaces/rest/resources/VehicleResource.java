@@ -23,6 +23,7 @@ import java.util.Date;
 public class VehicleResource {
 
     private Long id;
+    private Long ownerId;
     private String licensePlate;
     private String make;
     private String model;

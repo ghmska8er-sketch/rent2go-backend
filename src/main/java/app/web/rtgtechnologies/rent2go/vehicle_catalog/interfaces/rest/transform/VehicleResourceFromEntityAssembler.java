@@ -22,6 +22,7 @@ public final class VehicleResourceFromEntityAssembler {
     public static VehicleResource toResource(Vehicle entity) {
         return VehicleResource.builder()
             .id(entity.getId())
+            .ownerId(entity.getOwnerId())
             .licensePlate(entity.getLicensePlate())
             .make(entity.getMake())
             .model(entity.getModel())

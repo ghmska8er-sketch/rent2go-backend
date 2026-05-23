@@ -127,12 +127,22 @@ public class VehicleController {
         @RequestParam(required = false) List<String> categories,
         @RequestParam(required = false) BigDecimal minPrice,
         @RequestParam(required = false) BigDecimal maxPrice,
+        @RequestParam(required = false) Integer minYear,
+        @RequestParam(required = false) Integer maxYear,
+        @RequestParam(required = false) Integer seats,
+        @RequestParam(required = false) String transmission,
+        @RequestParam(required = false) String fuelType,
         @RequestParam(required = false) String location
     ) {
         SearchCriteria criteria = SearchCriteria.full(
             categories,
             minPrice,
             maxPrice,
+            minYear,
+            maxYear,
+            seats,
+            transmission,
+            fuelType,
             location
         );
 

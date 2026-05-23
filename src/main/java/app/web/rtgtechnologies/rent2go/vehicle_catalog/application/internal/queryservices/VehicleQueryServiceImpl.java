@@ -138,6 +138,34 @@ public class VehicleQueryServiceImpl implements VehicleQueryService {
                 .toList();
         }
 
+        // Filter by year range if provided
+        if (criteria.hasYearRange()) {
+            results = results.stream()
+                .filter(v -> matchesYear(v, criteria))
+                .toList();
+        }
+
+        // Filter by seats if provided
+        if (criteria.hasSeats()) {
+            results = results.stream()
+                .filter(v -> v.getSeats() != null && v.getSeats().equals(criteria.getSeats()))
+                .toList();
+        }
+
+        // Filter by transmission if provided
+        if (criteria.hasTransmission()) {
+            results = results.stream()
+                .filter(v -> v.getTransmission() != null && v.getTransmission().equalsIgnoreCase(criteria.getTransmission()))
+                .toList();
+        }
+
+        // Filter by fuel type if provided
+        if (criteria.hasFuelType()) {
+            results = results.stream()
+                .filter(v -> v.getFuelType() != null && v.getFuelType().equalsIgnoreCase(criteria.getFuelType()))
+                .toList();
+        }
+
         return results;
     }
 
@@ -157,6 +185,18 @@ public class VehicleQueryServiceImpl implements VehicleQueryService {
         }
 
         if (criteria.hasMaxPrice() && vehicle.getDailyPrice().compareTo(criteria.getMaxPrice()) > 0) {
+            return false;
+        }
+
+        return true;
+    }
+
+    private boolean matchesYear(Vehicle vehicle, SearchCriteria criteria) {
+        if (criteria.getMinYear() != null && vehicle.getYear() < criteria.getMinYear()) {
+            return false;
+        }
+
+        if (criteria.getMaxYear() != null && vehicle.getYear() > criteria.getMaxYear()) {
             return false;
         }
 

@@ -19,6 +19,11 @@ import java.util.Objects;
  * - categories: List of category names to filter by (e.g., ["Sedan", "SUV"])
  * - minPrice: Minimum daily rental price (optional)
  * - maxPrice: Maximum daily rental price (optional)
+ * - minYear: Minimum model year (optional)
+ * - maxYear: Maximum model year (optional)
+ * - seats: Minimum number of seats (optional)
+ * - transmission: Transmission type (optional)
+ * - fuelType: Fuel type (optional)
  * - location: Geographic location for pickup/dropoff (optional)
  * 
  * Invariants:
@@ -33,6 +38,11 @@ public class SearchCriteria extends ValueObject {
     private List<String> categories;
     private BigDecimal minPrice;
     private BigDecimal maxPrice;
+    private Integer minYear;
+    private Integer maxYear;
+    private Integer seats;
+    private String transmission;
+    private String fuelType;
     private String location;
 
     // ========== Factory Methods ==========
@@ -42,31 +52,41 @@ public class SearchCriteria extends ValueObject {
      */
     public static SearchCriteria byPriceRange(BigDecimal minPrice, BigDecimal maxPrice) {
         validatePriceRange(minPrice, maxPrice);
-        return new SearchCriteria(null, minPrice, maxPrice, null);
+        return new SearchCriteria(null, minPrice, maxPrice, null, null, null, null, null, null);
     }
 
     /**
      * Create search criteria with categories only.
      */
     public static SearchCriteria byCategories(List<String> categories) {
-        return new SearchCriteria(categories, null, null, null);
+        return new SearchCriteria(categories, null, null, null, null, null, null, null, null);
     }
 
     /**
      * Create search criteria with location only.
      */
     public static SearchCriteria byLocation(String location) {
-        return new SearchCriteria(null, null, null, location);
+        return new SearchCriteria(null, null, null, null, null, null, null, null, location);
     }
 
     /**
      * Create search criteria with all filters.
      */
-    public static SearchCriteria full(List<String> categories, BigDecimal minPrice, BigDecimal maxPrice, String location) {
+    public static SearchCriteria full(
+        List<String> categories,
+        BigDecimal minPrice,
+        BigDecimal maxPrice,
+        Integer minYear,
+        Integer maxYear,
+        Integer seats,
+        String transmission,
+        String fuelType,
+        String location
+    ) {
         if (minPrice != null && maxPrice != null) {
             validatePriceRange(minPrice, maxPrice);
         }
-        return new SearchCriteria(categories, minPrice, maxPrice, location);
+        return new SearchCriteria(categories, minPrice, maxPrice, minYear, maxYear, seats, transmission, fuelType, location);
     }
 
     // ========== Validation ==========
@@ -108,6 +128,34 @@ public class SearchCriteria extends ValueObject {
     }
 
     /**
+     * Check if this criteria filters by year range.
+     */
+    public boolean hasYearRange() {
+        return minYear != null || maxYear != null;
+    }
+
+    /**
+     * Check if this criteria filters by seats.
+     */
+    public boolean hasSeats() {
+        return seats != null;
+    }
+
+    /**
+     * Check if this criteria filters by transmission.
+     */
+    public boolean hasTransmission() {
+        return transmission != null && !transmission.isBlank();
+    }
+
+    /**
+     * Check if this criteria filters by fuel type.
+     */
+    public boolean hasFuelType() {
+        return fuelType != null && !fuelType.isBlank();
+    }
+
+    /**
      * Check if this criteria filters by categories.
      */
     public boolean hasCategories() {
@@ -131,12 +179,17 @@ public class SearchCriteria extends ValueObject {
         return Objects.equals(categories, that.categories) &&
                Objects.equals(minPrice, that.minPrice) &&
                Objects.equals(maxPrice, that.maxPrice) &&
+               Objects.equals(minYear, that.minYear) &&
+               Objects.equals(maxYear, that.maxYear) &&
+               Objects.equals(seats, that.seats) &&
+               Objects.equals(transmission, that.transmission) &&
+               Objects.equals(fuelType, that.fuelType) &&
                Objects.equals(location, that.location);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(categories, minPrice, maxPrice, location);
+        return Objects.hash(categories, minPrice, maxPrice, minYear, maxYear, seats, transmission, fuelType, location);
     }
 
     @Override
@@ -145,6 +198,11 @@ public class SearchCriteria extends ValueObject {
                 "categories=" + categories +
                 ", minPrice=" + minPrice +
                 ", maxPrice=" + maxPrice +
+            ", minYear=" + minYear +
+            ", maxYear=" + maxYear +
+            ", seats=" + seats +
+            ", transmission='" + transmission + '\'' +
+            ", fuelType='" + fuelType + '\'' +
                 ", location='" + location + '\'' +
                 '}';
     }

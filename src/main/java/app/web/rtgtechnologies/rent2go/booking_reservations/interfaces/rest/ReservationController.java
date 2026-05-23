@@ -94,4 +94,11 @@ public class ReservationController {
         var payload = results.stream().map(resourceAssembler::toResource).toList();
         return ResponseEntity.ok(payload);
     }
+
+    @GetMapping("/renter/{renterId}/history")
+    public ResponseEntity<java.util.List<ReservationResource>> getRenterHistory(@PathVariable Long renterId) {
+        var results = queryService.handle(new app.web.rtgtechnologies.rent2go.booking_reservations.domain.model.queries.GetReservationHistoryByRenterQuery(renterId));
+        var payload = results.stream().map(resourceAssembler::toResource).toList();
+        return ResponseEntity.ok(payload);
+    }
 }

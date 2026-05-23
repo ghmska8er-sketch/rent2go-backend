@@ -22,4 +22,6 @@ public interface ReservationQueryService {
     List<Reservation> handle(GetReservationsByRenterQuery query);
 
     List<Reservation> handle(GetReservationsByOwnerQuery query);
+
+    List<Reservation> handle(app.web.rtgtechnologies.rent2go.booking_reservations.domain.model.queries.GetReservationHistoryByRenterQuery query);
 }

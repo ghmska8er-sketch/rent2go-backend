@@ -32,6 +32,7 @@ public class PaymentsController {
     private final FareCalculationServiceImpl fareCalculationService;
     private final StripePaymentService stripePaymentService;
     private final app.web.rtgtechnologies.rent2go.payments.application.internal.services.PaymentsService paymentsService;
+    private final app.web.rtgtechnologies.rent2go.payments.application.internal.services.PromoService promoService;
 
     @Value("${stripe.webhook-secret:}")
     private String stripeWebhookSecret;
@@ -49,8 +50,19 @@ public class PaymentsController {
                 .collect(Collectors.toList());
 
         List<Discount> discounts = request.getDiscounts() == null ? List.of() : request.getDiscounts().stream()
-                .map(d -> Discount.of(d.getCode(), d.getPercentage()))
-                .collect(Collectors.toList());
+            .map(d -> Discount.of(d.getCode(), d.getPercentage()))
+            .collect(Collectors.toList());
+
+        // Apply promo code if present
+        if (request.getPromoCode() != null && !request.getPromoCode().isBlank()) {
+            var promoOpt = promoService.findActiveDiscountByCode(request.getPromoCode());
+            if (promoOpt.isPresent()) {
+            var promo = promoOpt.get();
+            // merge into discounts list
+            discounts = new java.util.ArrayList<>(discounts);
+            discounts.add(promo);
+            }
+        }
 
         Money result = fareCalculationService.calculate(base, fees, discounts);
         MoneyResource res = new MoneyResource(result.getAmount(), result.getCurrency());

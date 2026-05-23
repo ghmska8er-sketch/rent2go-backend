@@ -8,6 +8,7 @@ public class CalculateFareRequest {
     private String currency;
     private List<FeeDto> fees;
     private List<DiscountDto> discounts;
+    private String promoCode;
 
     public BigDecimal getBaseAmount() {
         return baseAmount;
@@ -39,5 +40,13 @@ public class CalculateFareRequest {
 
     public void setDiscounts(List<DiscountDto> discounts) {
         this.discounts = discounts;
+    }
+
+    public String getPromoCode() {
+        return promoCode;
+    }
+
+    public void setPromoCode(String promoCode) {
+        this.promoCode = promoCode;
     }
 }

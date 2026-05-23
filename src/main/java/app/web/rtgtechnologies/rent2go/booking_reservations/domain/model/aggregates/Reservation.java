@@ -137,6 +137,18 @@ public class Reservation extends AuditableAbstractAggregateRoot<Reservation> {
         this.cancelledAt = LocalDateTime.now();
     }
 
+    public void modify(DateRange newRange) {
+        if (this.status.isTerminal()) {
+            throw new IllegalStateException("Cannot modify a terminal reservation");
+        }
+
+        if (newRange == null) {
+            throw new IllegalArgumentException("New date range is required");
+        }
+
+        this.dateRange = newRange;
+    }
+
     private void ensurePending() {
         if (!this.status.isPending()) {
             throw new IllegalStateException("Reservation must be pending before confirmation");

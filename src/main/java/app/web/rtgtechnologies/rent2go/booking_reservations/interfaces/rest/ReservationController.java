@@ -10,6 +10,8 @@ import app.web.rtgtechnologies.rent2go.booking_reservations.interfaces.rest.asse
 import app.web.rtgtechnologies.rent2go.booking_reservations.interfaces.rest.assemblers.ReservationResourceFromEntityAssembler;
 import app.web.rtgtechnologies.rent2go.booking_reservations.interfaces.rest.assemblers.CancelReservationCommandFromResourceAssembler;
 import app.web.rtgtechnologies.rent2go.booking_reservations.interfaces.rest.resources.CancelReservationResource;
+import app.web.rtgtechnologies.rent2go.booking_reservations.interfaces.rest.assemblers.ModifyReservationCommandFromResourceAssembler;
+import app.web.rtgtechnologies.rent2go.booking_reservations.interfaces.rest.resources.ModifyReservationResource;
 import app.web.rtgtechnologies.rent2go.booking_reservations.domain.model.commands.CreateReservationCommand;
 import lombok.AllArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -28,6 +30,7 @@ public class ReservationController {
     private final CreateReservationCommandFromResourceAssembler commandAssembler;
     private final ReservationResourceFromEntityAssembler resourceAssembler;
     private final CancelReservationCommandFromResourceAssembler cancelAssembler;
+    private final ModifyReservationCommandFromResourceAssembler modifyAssembler;
 
     @PostMapping
     public ResponseEntity<ReservationResource> createReservation(@RequestBody CreateReservationResource resource) {
@@ -49,6 +52,13 @@ public class ReservationController {
         var command = cancelAssembler.toCommand(id, resource);
         var canceled = commandService.handle(command);
         return ResponseEntity.ok(resourceAssembler.toResource(canceled));
+    }
+
+    @PatchMapping("/{id}")
+    public ResponseEntity<ReservationResource> modifyReservation(@PathVariable Long id, @RequestBody ModifyReservationResource resource) {
+        var command = modifyAssembler.toCommand(id, resource);
+        var updated = commandService.handle(command);
+        return ResponseEntity.ok(resourceAssembler.toResource(updated));
     }
 
     @GetMapping

@@ -16,8 +16,11 @@ import java.util.Objects;
  * - PENDING: awaiting confirmation and payment
  * - CONFIRMED: payment received, awaiting pickup
  * - ACTIVE: customer has picked up vehicle
+ * - RETURN_PENDING: vehicle is being returned
+ * - RETURN_CONFIRMED: return has been acknowledged
  * - COMPLETED: vehicle returned, booking finished
  * - CANCELLED: booking cancelled by customer or system
+ * - EXPIRED: booking expired before confirmation or pickup
  */
 @Getter
 @NoArgsConstructor
@@ -40,12 +43,24 @@ public class BookingStatus extends ValueObject {
         return new BookingStatus("ACTIVE");
     }
 
+    public static BookingStatus RETURN_PENDING() {
+        return new BookingStatus("RETURN_PENDING");
+    }
+
+    public static BookingStatus RETURN_CONFIRMED() {
+        return new BookingStatus("RETURN_CONFIRMED");
+    }
+
     public static BookingStatus COMPLETED() {
         return new BookingStatus("COMPLETED");
     }
 
     public static BookingStatus CANCELLED() {
         return new BookingStatus("CANCELLED");
+    }
+
+    public static BookingStatus EXPIRED() {
+        return new BookingStatus("EXPIRED");
     }
 
     public boolean isPending() {
@@ -60,6 +75,14 @@ public class BookingStatus extends ValueObject {
         return "ACTIVE".equals(this.status);
     }
 
+    public boolean isReturnPending() {
+        return "RETURN_PENDING".equals(this.status);
+    }
+
+    public boolean isReturnConfirmed() {
+        return "RETURN_CONFIRMED".equals(this.status);
+    }
+
     public boolean isCompleted() {
         return "COMPLETED".equals(this.status);
     }
@@ -68,8 +91,12 @@ public class BookingStatus extends ValueObject {
         return "CANCELLED".equals(this.status);
     }
 
+    public boolean isExpired() {
+        return "EXPIRED".equals(this.status);
+    }
+
     public boolean isTerminal() {
-        return isCompleted() || isCancelled();
+        return isCompleted() || isCancelled() || isExpired();
     }
 
     @Override

@@ -52,6 +52,8 @@ public class PaymentsController {
 
         Money base = Money.of(request.getBaseAmount(), request.getCurrency());
 
+        BigDecimal subtotal = request.getBaseAmount();
+
         List<Fee> fees = request.getFees() == null ? List.of() : request.getFees().stream()
                 .map(f -> Fee.of(f.getCode(), f.getAmount()))
                 .collect(Collectors.toList());
@@ -72,7 +74,35 @@ public class PaymentsController {
         }
 
         Money result = fareCalculationService.calculate(base, fees, discounts);
+        BigDecimal serviceFee = BigDecimal.ZERO;
+        BigDecimal coverageFee = BigDecimal.ZERO;
+        BigDecimal taxes = BigDecimal.ZERO;
+
+        for (Fee fee : fees) {
+            if (fee == null || fee.getAmount() == null) {
+                continue;
+            }
+
+            String code = fee.getCode() == null ? "" : fee.getCode().toLowerCase();
+            if (code.contains("coverage") || code.contains("insurance")) {
+                coverageFee = coverageFee.add(fee.getAmount());
+            } else if (code.contains("tax")) {
+                taxes = taxes.add(fee.getAmount());
+            } else {
+                serviceFee = serviceFee.add(fee.getAmount());
+            }
+        }
+
+        BigDecimal totalBeforeDiscount = subtotal.add(serviceFee).add(coverageFee).add(taxes);
+        BigDecimal discountAmount = totalBeforeDiscount.subtract(result.getAmount());
+
         MoneyResource res = new MoneyResource(result.getAmount(), result.getCurrency());
+        res.setSubtotal(subtotal);
+        res.setServiceFee(serviceFee);
+        res.setCoverageFee(coverageFee);
+        res.setTaxes(taxes);
+        res.setDiscount(discountAmount.max(BigDecimal.ZERO));
+        res.setTotal(result.getAmount());
         return ResponseEntity.ok(res);
     }
 
@@ -161,6 +191,8 @@ public class PaymentsController {
             resource.setTo(to);
             resource.setCurrency("USD");
             resource.setTotalAmountCents(totalCents != null ? totalCents : 0L);
+            resource.setAvailablePayoutCents(totalCents != null ? totalCents : 0L);
+            resource.setPendingPayoutCents(0L);
             resource.setPaymentsCount(paymentCount != null ? paymentCount : 0L);
             return ResponseEntity.ok(resource);
         } catch (DateTimeParseException ex) {

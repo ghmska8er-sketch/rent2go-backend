@@ -2,6 +2,7 @@ package app.web.rtgtechnologies.rent2go.booking_reservations.interfaces.rest.res
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 
 public record ReservationResource(
     Long id,
@@ -12,5 +13,8 @@ public record ReservationResource(
     LocalDate startDate,
     LocalDate endDate,
     BigDecimal totalAmount,
-    String status
+    String status,
+    LocalDateTime pickupConfirmedAt,
+    LocalDateTime returnConfirmedAt,
+    String damageReport
 ) {}

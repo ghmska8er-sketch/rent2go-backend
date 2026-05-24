@@ -87,6 +87,15 @@ public class Vehicle extends AuditableAbstractAggregateRoot<Vehicle> {
     @OneToMany(cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY, mappedBy = "vehicle")
     private List<VehicleImage> images = new ArrayList<>();
 
+    @Builder.Default
+    @ManyToMany(fetch = FetchType.LAZY)
+    @JoinTable(
+        name = "vehicle_feature_mappings",
+        joinColumns = @JoinColumn(name = "vehicle_id"),
+        inverseJoinColumns = @JoinColumn(name = "feature_id")
+    )
+    private List<VehicleFeature> features = new ArrayList<>();
+
     // ========== Business Logic ==========
 
     public boolean isAvailable() {
@@ -250,5 +259,32 @@ public class Vehicle extends AuditableAbstractAggregateRoot<Vehicle> {
      */
     public boolean hasImages() {
         return !this.images.isEmpty();
+    }
+
+    public List<VehicleFeature> getFeatures() {
+        return new ArrayList<>(this.features);
+    }
+
+    public void addFeature(VehicleFeature feature) {
+        if (feature == null) {
+            throw new IllegalArgumentException("Feature cannot be null");
+        }
+
+        boolean alreadyLinked = this.features.stream()
+            .anyMatch(existingFeature -> existingFeature.getId() != null
+                && feature.getId() != null
+                && existingFeature.getId().equals(feature.getId()));
+
+        if (!alreadyLinked) {
+            this.features.add(feature);
+        }
+    }
+
+    public boolean removeFeature(Long featureId) {
+        if (featureId == null) {
+            return false;
+        }
+
+        return this.features.removeIf(feature -> feature.getId() != null && feature.getId().equals(featureId));
     }
 }

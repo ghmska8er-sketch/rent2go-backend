@@ -56,8 +56,17 @@ public class Reservation extends AuditableAbstractAggregateRoot<Reservation> {
     @Column(name = "cancelled_at")
     private LocalDateTime cancelledAt;
 
+    @Column(name = "pickup_confirmed_at")
+    private LocalDateTime pickupConfirmedAt;
+
     @Column(name = "returned_at")
     private LocalDateTime returnedAt;
+
+    @Column(name = "return_confirmed_at")
+    private LocalDateTime returnConfirmedAt;
+
+    @Column(name = "damage_report", length = 1000)
+    private String damageReport;
     
     @Column(name = "payment_intent_id")
     private String paymentIntentId;
@@ -127,6 +136,7 @@ public class Reservation extends AuditableAbstractAggregateRoot<Reservation> {
         }
 
         this.status = BookingStatus.ACTIVE();
+        this.pickupConfirmedAt = LocalDateTime.now();
     }
 
     public void complete() {
@@ -135,7 +145,16 @@ public class Reservation extends AuditableAbstractAggregateRoot<Reservation> {
         }
 
         this.status = BookingStatus.COMPLETED();
+        this.returnConfirmedAt = LocalDateTime.now();
         this.returnedAt = LocalDateTime.now();
+    }
+
+    public void expire() {
+        if (this.status.isTerminal()) {
+            throw new IllegalStateException("Terminal reservations cannot expire");
+        }
+
+        this.status = BookingStatus.EXPIRED();
     }
 
     public void cancel() {
@@ -157,6 +176,10 @@ public class Reservation extends AuditableAbstractAggregateRoot<Reservation> {
         }
 
         this.dateRange = newRange;
+    }
+
+    public void setDamageReport(String damageReport) {
+        this.damageReport = damageReport;
     }
 
     public void markPaid(String paymentIntentId) {

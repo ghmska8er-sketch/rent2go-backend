@@ -17,7 +17,10 @@ public class ReservationResourceFromEntityAssembler {
             r.getDateRange().getStartDate(),
             r.getDateRange().getEndDate(),
             r.getTotalAmount(),
-            r.getStatus().getStatus()
+            r.getStatus().getStatus(),
+            r.getPickupConfirmedAt(),
+            r.getReturnConfirmedAt(),
+            r.getDamageReport()
         );
     }
 }

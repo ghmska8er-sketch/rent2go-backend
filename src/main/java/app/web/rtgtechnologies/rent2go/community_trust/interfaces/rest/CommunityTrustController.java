@@ -14,6 +14,7 @@ import app.web.rtgtechnologies.rent2go.community_trust.domain.model.commands.Sen
 import app.web.rtgtechnologies.rent2go.community_trust.domain.model.commands.StartConversationCommand;
 import app.web.rtgtechnologies.rent2go.community_trust.domain.model.commands.SubmitReviewCommand;
 import app.web.rtgtechnologies.rent2go.community_trust.domain.model.queries.GetConversationByIdQuery;
+import app.web.rtgtechnologies.rent2go.community_trust.domain.model.queries.GetCommunityTrustDashboardQuery;
 import app.web.rtgtechnologies.rent2go.community_trust.domain.model.queries.GetConversationsByUserQuery;
 import app.web.rtgtechnologies.rent2go.community_trust.domain.model.queries.GetAverageRatingQuery;
 import app.web.rtgtechnologies.rent2go.community_trust.domain.model.queries.GetMessagesByConversationQuery;
@@ -31,6 +32,7 @@ import app.web.rtgtechnologies.rent2go.community_trust.interfaces.rest.assembler
 import app.web.rtgtechnologies.rent2go.community_trust.interfaces.rest.assemblers.ReviewResourceFromEntityAssembler;
 import app.web.rtgtechnologies.rent2go.community_trust.interfaces.rest.assemblers.SubmitReviewCommandFromResourceAssembler;
 import app.web.rtgtechnologies.rent2go.community_trust.interfaces.rest.resources.ConversationResource;
+import app.web.rtgtechnologies.rent2go.community_trust.interfaces.rest.resources.CommunityTrustDashboardResource;
 import app.web.rtgtechnologies.rent2go.community_trust.interfaces.rest.resources.BlockUserResource;
 import app.web.rtgtechnologies.rent2go.community_trust.interfaces.rest.resources.MessageResource;
 import app.web.rtgtechnologies.rent2go.community_trust.interfaces.rest.resources.FlagReviewResource;
@@ -124,6 +126,23 @@ public class CommunityTrustController {
                 rep.getLastModerationReason()
             )))
             .orElseGet(() -> ResponseEntity.notFound().build());
+    }
+
+    @GetMapping("/dashboard")
+    public ResponseEntity<CommunityTrustDashboardResource> getDashboard() {
+        var dashboard = queryService.handle(new GetCommunityTrustDashboardQuery());
+        return ResponseEntity.ok(new CommunityTrustDashboardResource(
+            dashboard.totalReviews(),
+            dashboard.approvedReviews(),
+            dashboard.rejectedReviews(),
+            dashboard.flaggedReviews(),
+            dashboard.openReports(),
+            dashboard.resolvedReports(),
+            dashboard.blockedUsers(),
+            dashboard.activeConversations(),
+            dashboard.totalMessages(),
+            dashboard.averageTrustScore()
+        ));
     }
 
     @GetMapping("/vehicles/{vehicleId}/rating")

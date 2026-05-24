@@ -6,6 +6,9 @@ public record RegisterUserCommand(
         String email,
         String password,
         String username,
+        String fullName,
+        String phone,
+        String profileImageUrl,
         AccountType accountType
 ) {
 }

@@ -12,7 +12,15 @@ public class AuthTokenResourceFromUserAssembler {
                 token,
                 user.getId(),
                 user.getEmail().getValue(),
-                user.getUsername().getValue()
+            user.getUsername().getValue(),
+            user.getFullName(),
+            user.getPhone(),
+            user.getAccountType() == null ? null : user.getAccountType().name(),
+            user.getStatus() == null ? null : user.getStatus().name(),
+            user.getEmailVerified(),
+            user.getPhoneVerified(),
+            user.getTwoFactorEnabled(),
+            user.getProfileImageUrl()
         );
     }
 }

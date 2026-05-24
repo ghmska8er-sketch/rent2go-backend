@@ -19,6 +19,16 @@ public record RegisterUserResource(
         @Size(min = 3, max = 50, message = "Username must be between 3 and 50 characters")
         String username,
 
+        @NotBlank(message = "Full name is required")
+        @Size(min = 3, max = 150, message = "Full name must be between 3 and 150 characters")
+        String fullName,
+
+        @NotBlank(message = "Phone is required")
+        @Size(min = 7, max = 20, message = "Phone must be between 7 and 20 characters")
+        String phone,
+
+        String profileImageUrl,
+
         @NotNull(message = "Account type is required")
         AccountType accountType
 ) {

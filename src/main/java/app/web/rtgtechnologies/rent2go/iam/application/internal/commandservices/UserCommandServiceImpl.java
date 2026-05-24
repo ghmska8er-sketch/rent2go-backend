@@ -73,7 +73,15 @@ public class UserCommandServiceImpl implements UserCommandService {
         Password password = new Password(command.password());
         Username username = new Username(command.username());
 
-        User user = new User(email, password, username, command.accountType());
+        User user = new User(
+            email,
+            password,
+            username,
+            command.fullName(),
+            command.phone(),
+            command.profileImageUrl(),
+            command.accountType()
+        );
 
         // Guardar
         User savedUser = userRepository.save(user);

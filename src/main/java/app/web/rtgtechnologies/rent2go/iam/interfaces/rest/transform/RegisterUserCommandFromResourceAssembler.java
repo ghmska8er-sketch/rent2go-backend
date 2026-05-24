@@ -12,6 +12,9 @@ public class RegisterUserCommandFromResourceAssembler {
                 resource.email(),
                 resource.password(),
                 resource.username(),
+            resource.fullName(),
+            resource.phone(),
+            resource.profileImageUrl(),
                 resource.accountType()
         );
     }

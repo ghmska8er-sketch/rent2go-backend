@@ -2,7 +2,9 @@ package app.web.rtgtechnologies.rent2go.community_trust.interfaces.rest.assemble
 
 import app.web.rtgtechnologies.rent2go.community_trust.domain.model.aggregates.Conversation;
 import app.web.rtgtechnologies.rent2go.community_trust.interfaces.rest.resources.ConversationResource;
+import org.springframework.stereotype.Component;
 
+@Component
 public class ConversationResourceFromEntityAssembler {
 
     public ConversationResource toResource(Conversation conversation) {

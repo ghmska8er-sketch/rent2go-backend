@@ -2,7 +2,9 @@ package app.web.rtgtechnologies.rent2go.community_trust.interfaces.rest.assemble
 
 import app.web.rtgtechnologies.rent2go.community_trust.domain.model.commands.OpenReservationDisputeCommand;
 import app.web.rtgtechnologies.rent2go.community_trust.interfaces.rest.resources.OpenReservationDisputeResource;
+import org.springframework.stereotype.Component;
 
+@Component
 public class OpenReservationDisputeCommandFromResourceAssembler {
 
     public OpenReservationDisputeCommand toCommand(Long reservationId, OpenReservationDisputeResource resource) {

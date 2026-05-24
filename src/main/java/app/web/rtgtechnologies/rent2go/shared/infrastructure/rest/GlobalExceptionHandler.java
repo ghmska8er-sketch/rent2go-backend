@@ -47,8 +47,11 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         ));
     }
 
-    @ExceptionHandler(MissingServletRequestParameterException.class)
-    public ResponseEntity<Object> handleMissingRequestParameter(MissingServletRequestParameterException ex) {
+    @Override
+    protected ResponseEntity<Object> handleMissingServletRequestParameter(MissingServletRequestParameterException ex,
+                                                                         HttpHeaders headers,
+                                                                         HttpStatusCode status,
+                                                                         WebRequest request) {
         Map<String, Object> body = new HashMap<>();
         body.put("error", "Bad Request");
         body.put("message", ex.getMessage());

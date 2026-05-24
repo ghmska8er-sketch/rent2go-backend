@@ -8,6 +8,7 @@ import app.web.rtgtechnologies.rent2go.community_trust.domain.model.commands.Clo
 import app.web.rtgtechnologies.rent2go.community_trust.domain.model.commands.ApproveReviewCommand;
 import app.web.rtgtechnologies.rent2go.community_trust.domain.model.commands.BlockUserForTrustCommand;
 import app.web.rtgtechnologies.rent2go.community_trust.domain.model.commands.FlagReviewCommand;
+import app.web.rtgtechnologies.rent2go.community_trust.domain.model.commands.OpenReservationDisputeCommand;
 import app.web.rtgtechnologies.rent2go.community_trust.domain.model.commands.RejectReviewCommand;
 import app.web.rtgtechnologies.rent2go.community_trust.domain.model.commands.SendMessageCommand;
 import app.web.rtgtechnologies.rent2go.community_trust.domain.model.commands.StartConversationCommand;
@@ -24,6 +25,7 @@ import app.web.rtgtechnologies.rent2go.community_trust.interfaces.rest.assembler
 import app.web.rtgtechnologies.rent2go.community_trust.interfaces.rest.assemblers.MessageResourceFromEntityAssembler;
 import app.web.rtgtechnologies.rent2go.community_trust.interfaces.rest.assemblers.FlagReviewCommandFromResourceAssembler;
 import app.web.rtgtechnologies.rent2go.community_trust.interfaces.rest.assemblers.ModerationActionCommandFromResourceAssembler;
+import app.web.rtgtechnologies.rent2go.community_trust.interfaces.rest.assemblers.OpenReservationDisputeCommandFromResourceAssembler;
 import app.web.rtgtechnologies.rent2go.community_trust.interfaces.rest.assemblers.SendMessageCommandFromResourceAssembler;
 import app.web.rtgtechnologies.rent2go.community_trust.interfaces.rest.assemblers.StartConversationCommandFromResourceAssembler;
 import app.web.rtgtechnologies.rent2go.community_trust.interfaces.rest.assemblers.ReviewResourceFromEntityAssembler;
@@ -33,9 +35,11 @@ import app.web.rtgtechnologies.rent2go.community_trust.interfaces.rest.resources
 import app.web.rtgtechnologies.rent2go.community_trust.interfaces.rest.resources.MessageResource;
 import app.web.rtgtechnologies.rent2go.community_trust.interfaces.rest.resources.FlagReviewResource;
 import app.web.rtgtechnologies.rent2go.community_trust.interfaces.rest.resources.ModerationActionResource;
+import app.web.rtgtechnologies.rent2go.community_trust.interfaces.rest.resources.OpenReservationDisputeResource;
 import app.web.rtgtechnologies.rent2go.community_trust.interfaces.rest.resources.ReviewResource;
 import app.web.rtgtechnologies.rent2go.community_trust.interfaces.rest.resources.SendMessageResource;
 import app.web.rtgtechnologies.rent2go.community_trust.interfaces.rest.resources.StartConversationResource;
+import app.web.rtgtechnologies.rent2go.community_trust.interfaces.rest.resources.TrustReportResource;
 import app.web.rtgtechnologies.rent2go.community_trust.interfaces.rest.resources.SubmitReviewResource;
 import app.web.rtgtechnologies.rent2go.community_trust.interfaces.rest.resources.UserReputationResource;
 import app.web.rtgtechnologies.rent2go.community_trust.interfaces.rest.resources.VehicleRatingResource;
@@ -62,6 +66,7 @@ public class CommunityTrustController {
     private final BlockUserForTrustCommandFromResourceAssembler blockAssembler;
     private final StartConversationCommandFromResourceAssembler startConversationAssembler;
     private final SendMessageCommandFromResourceAssembler sendMessageAssembler;
+    private final OpenReservationDisputeCommandFromResourceAssembler disputeAssembler;
     private final ReviewResourceFromEntityAssembler reviewAssembler;
     private final ConversationResourceFromEntityAssembler conversationAssembler;
     private final MessageResourceFromEntityAssembler messageAssembler;
@@ -138,6 +143,27 @@ public class CommunityTrustController {
         BlockUserForTrustCommand command = blockAssembler.toCommand(userId, resource);
         commandService.handle(command);
         return ResponseEntity.noContent().build();
+    }
+
+    @PostMapping("/reservations/{reservationId}/disputes")
+    public ResponseEntity<TrustReportResource> openReservationDispute(@PathVariable Long reservationId, @Valid @RequestBody OpenReservationDisputeResource resource) {
+        OpenReservationDisputeCommand command = disputeAssembler.toCommand(reservationId, resource);
+        var saved = commandService.handle(command);
+        return ResponseEntity.created(URI.create("/api/v1/community-trust/reservations/" + reservationId + "/disputes/" + saved.getId()))
+            .body(new TrustReportResource(
+                saved.getId(),
+                saved.getSubjectType() == null ? null : saved.getSubjectType().name(),
+                saved.getSubjectId(),
+                saved.getReservationId(),
+                saved.getReviewId(),
+                saved.getReportedUserId(),
+                saved.getReporterId(),
+                saved.getReason(),
+                saved.getStatus() == null ? null : saved.getStatus().name(),
+                saved.getModerationNote(),
+                saved.getCreatedAt() == null ? null : saved.getCreatedAt().toString(),
+                saved.getUpdatedAt() == null ? null : saved.getUpdatedAt().toString()
+            ));
     }
 
     @PostMapping("/conversations")

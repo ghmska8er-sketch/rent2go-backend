@@ -7,6 +7,7 @@ import app.web.rtgtechnologies.rent2go.community_trust.domain.model.aggregates.U
 import app.web.rtgtechnologies.rent2go.community_trust.domain.model.commands.ApproveReviewCommand;
 import app.web.rtgtechnologies.rent2go.community_trust.domain.model.commands.BlockUserForTrustCommand;
 import app.web.rtgtechnologies.rent2go.community_trust.domain.model.commands.FlagReviewCommand;
+import app.web.rtgtechnologies.rent2go.community_trust.domain.model.commands.OpenReservationDisputeCommand;
 import app.web.rtgtechnologies.rent2go.community_trust.domain.model.commands.RejectReviewCommand;
 import app.web.rtgtechnologies.rent2go.community_trust.domain.model.commands.SubmitReviewCommand;
 import app.web.rtgtechnologies.rent2go.community_trust.domain.model.services.ReviewCommandService;
@@ -133,6 +134,35 @@ public class ReviewCommandServiceImpl implements ReviewCommandService {
             .forEach(report -> report.dismiss(command.reason()));
         refreshReputation(review.getReviewedUserId());
         return saved;
+    }
+
+    @Override
+    public TrustReport handle(OpenReservationDisputeCommand command) {
+        if (command == null) {
+            throw new IllegalArgumentException("Command is required");
+        }
+
+        var reservation = reservationRepository.findById(command.reservationId())
+            .orElseThrow(() -> new IllegalArgumentException("Reservation not found: " + command.reservationId()));
+
+        if (!reservation.getStatus().isCompleted()) {
+            throw new IllegalStateException("Only completed reservations can open disputes");
+        }
+
+        if (!reservation.getRenterId().equals(command.reporterId()) && !reservation.getOwnerId().equals(command.reporterId())) {
+            throw new IllegalArgumentException("Reporter must be part of the reservation");
+        }
+
+        Long reportedUserId = reservation.getRenterId().equals(command.reporterId())
+            ? reservation.getOwnerId()
+            : reservation.getRenterId();
+
+        return trustReportRepository.save(TrustReport.openDispute(
+            reservation.getId(),
+            reportedUserId,
+            command.reporterId(),
+            command.reason()
+        ));
     }
 
     @Override

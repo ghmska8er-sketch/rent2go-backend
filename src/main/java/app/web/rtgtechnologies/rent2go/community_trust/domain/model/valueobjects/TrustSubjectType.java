@@ -2,6 +2,7 @@ package app.web.rtgtechnologies.rent2go.community_trust.domain.model.valueobject
 
 public enum TrustSubjectType {
     REVIEW,
+    RESERVATION,
     USER,
     VEHICLE
 }

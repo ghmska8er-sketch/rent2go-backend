@@ -24,6 +24,9 @@ public class TrustReport extends AuditableAbstractAggregateRoot<TrustReport> {
     @Column(name = "subject_id", nullable = false)
     private Long subjectId;
 
+    @Column(name = "reservation_id")
+    private Long reservationId;
+
     @Column(name = "review_id")
     private Long reviewId;
 
@@ -45,12 +48,14 @@ public class TrustReport extends AuditableAbstractAggregateRoot<TrustReport> {
 
     private TrustReport(TrustSubjectType subjectType,
                         Long subjectId,
+                        Long reservationId,
                         Long reviewId,
                         Long reportedUserId,
                         Long reporterId,
                         String reason) {
         this.subjectType = subjectType;
         this.subjectId = subjectId;
+        this.reservationId = reservationId;
         this.reviewId = reviewId;
         this.reportedUserId = reportedUserId;
         this.reporterId = reporterId;
@@ -68,7 +73,26 @@ public class TrustReport extends AuditableAbstractAggregateRoot<TrustReport> {
             throw new IllegalArgumentException("subjectType, subjectId, reporterId and reason are required");
         }
 
-        return new TrustReport(subjectType, subjectId, reviewId, reportedUserId, reporterId, reason.trim());
+        return new TrustReport(subjectType, subjectId, null, reviewId, reportedUserId, reporterId, reason.trim());
+    }
+
+    public static TrustReport openDispute(Long reservationId,
+                                          Long reportedUserId,
+                                          Long reporterId,
+                                          String reason) {
+        if (reservationId == null || reporterId == null || reason == null || reason.isBlank()) {
+            throw new IllegalArgumentException("reservationId, reporterId and reason are required");
+        }
+
+        return new TrustReport(
+            TrustSubjectType.RESERVATION,
+            reservationId,
+            reservationId,
+            null,
+            reportedUserId,
+            reporterId,
+            reason.trim()
+        );
     }
 
     public void resolve(String note) {

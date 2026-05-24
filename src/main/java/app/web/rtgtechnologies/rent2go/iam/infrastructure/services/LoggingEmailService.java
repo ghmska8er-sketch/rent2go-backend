@@ -10,13 +10,7 @@ public class LoggingEmailService implements EmailService {
 
     @Override
     public void sendPasswordResetEmail(String toEmail, String token) {
-        log.info("[PasswordReset] To: {} Token: {}", toEmail, token);
-        try {
-            java.nio.file.Files.writeString(java.nio.file.Path.of("password_reset_tokens.log"),
-                    String.format("%s %s %s%n", java.time.OffsetDateTime.now(), toEmail, token),
-                    java.nio.file.StandardOpenOption.CREATE, java.nio.file.StandardOpenOption.APPEND);
-        } catch (Exception e) {
-            log.warn("Failed to write password reset token to file", e);
-        }
+        // Production-like behavior: log that a password reset email was requested. Do NOT persist tokens to disk.
+        log.info("[PasswordReset] To: {} (token hidden in logs for security)", toEmail);
     }
 }

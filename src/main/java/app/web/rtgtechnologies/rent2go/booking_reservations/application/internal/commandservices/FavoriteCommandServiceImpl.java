@@ -20,15 +20,15 @@ public class FavoriteCommandServiceImpl implements FavoriteCommandService {
 
     @Override
     public Favorite handle(AddFavoriteCommand command) {
-        favoriteRepository.findByRenterIdAndVehicleId(command.renterId(), command.vehicleId())
+        favoriteRepository.findByUserIdAndVehicleId(command.userId(), command.vehicleId())
             .ifPresent(existing -> { throw new IllegalArgumentException("Favorite already exists"); });
 
-        Favorite fav = Favorite.of(command.renterId(), command.vehicleId());
+        Favorite fav = Favorite.of(command.userId(), command.vehicleId());
         return favoriteRepository.save(fav);
     }
 
     @Override
     public void handle(RemoveFavoriteCommand command) {
-        favoriteRepository.deleteByRenterIdAndVehicleId(command.renterId(), command.vehicleId());
+        favoriteRepository.deleteByUserIdAndVehicleId(command.userId(), command.vehicleId());
     }
 }

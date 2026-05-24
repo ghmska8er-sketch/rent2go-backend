@@ -10,9 +10,9 @@ import java.util.Optional;
 @Repository
 public interface FavoriteRepository extends JpaRepository<Favorite, Long> {
 
-    List<Favorite> findAllByRenterId(Long renterId);
+    List<Favorite> findAllByUserId(Long userId);
 
-    Optional<Favorite> findByRenterIdAndVehicleId(Long renterId, Long vehicleId);
+    Optional<Favorite> findByUserIdAndVehicleId(Long userId, Long vehicleId);
 
-    void deleteByRenterIdAndVehicleId(Long renterId, Long vehicleId);
+    void deleteByUserIdAndVehicleId(Long userId, Long vehicleId);
 }

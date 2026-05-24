@@ -2,4 +2,4 @@ package app.web.rtgtechnologies.rent2go.booking_reservations.interfaces.rest.res
 
 import java.util.Date;
 
-public record FavoriteResource(Long id, Long renterId, Long vehicleId, Date createdAt) {}
+public record FavoriteResource(Long id, Long userId, Long vehicleId, Date createdAt) {}

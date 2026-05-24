@@ -7,6 +7,7 @@ import app.web.rtgtechnologies.rent2go.payments.interfaces.rest.resources.PromoC
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
+import jakarta.validation.Valid;
 
 import java.time.LocalDateTime;
 import java.time.format.DateTimeParseException;
@@ -24,7 +25,7 @@ public class PromoCodeController {
 
     @PostMapping
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<PromoCodeResource> create(@RequestBody CreatePromoRequest req) {
+    public ResponseEntity<PromoCodeResource> create(@Valid @RequestBody CreatePromoRequest req) {
         if (req == null || req.getCode() == null || req.getPercentage() == null) return ResponseEntity.badRequest().build();
         LocalDateTime expires = null;
         if (req.getExpiresAt() != null) {

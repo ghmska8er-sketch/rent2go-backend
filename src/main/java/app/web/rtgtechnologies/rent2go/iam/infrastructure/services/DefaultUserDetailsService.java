@@ -1,7 +1,7 @@
 package app.web.rtgtechnologies.rent2go.iam.infrastructure.services;
 
-import app.web.rtgtechnologies.rent2go.iam.infrastructure.persistence.jpa.repositories.UserRepository;
 import app.web.rtgtechnologies.rent2go.iam.domain.model.aggregates.User;
+import app.web.rtgtechnologies.rent2go.iam.infrastructure.persistence.jpa.repositories.UserRepository;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -24,9 +24,6 @@ public class DefaultUserDetailsService implements UserDetailsService {
     @Value("${application.security.admin-emails:}")
     private String adminEmails;
 
-    @Value("${application.security.owner-emails:}")
-    private String ownerEmails;
-
     public DefaultUserDetailsService(UserRepository userRepository) {
         this.userRepository = userRepository;
     }
@@ -38,11 +35,9 @@ public class DefaultUserDetailsService implements UserDetailsService {
 
         List<SimpleGrantedAuthority> authorities = new ArrayList<>();
         authorities.add(new SimpleGrantedAuthority("ROLE_USER"));
+
         if (isAdminEmail(username)) {
             authorities.add(new SimpleGrantedAuthority("ROLE_ADMIN"));
-        }
-        if (isOwnerEmail(username)) {
-            authorities.add(new SimpleGrantedAuthority("ROLE_OWNER"));
         }
 
         return org.springframework.security.core.userdetails.User
@@ -58,10 +53,6 @@ public class DefaultUserDetailsService implements UserDetailsService {
 
     private boolean isAdminEmail(String email) {
         return parseCsv(adminEmails).contains(email.toLowerCase());
-    }
-
-    private boolean isOwnerEmail(String email) {
-        return parseCsv(ownerEmails).contains(email.toLowerCase());
     }
 
     private Set<String> parseCsv(String commaSeparated) {

@@ -1,12 +1,22 @@
 package app.web.rtgtechnologies.rent2go.payments.interfaces.rest.resources;
 
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 import java.math.BigDecimal;
 import java.util.List;
 
 public class CalculateFareRequest {
+    @NotNull(message = "Base amount is required")
     private BigDecimal baseAmount;
+
+    @NotBlank(message = "Currency is required")
     private String currency;
+
+    @Valid
     private List<FeeDto> fees;
+
+    @Valid
     private List<DiscountDto> discounts;
     private String promoCode;
 

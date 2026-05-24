@@ -7,6 +7,8 @@ public record UserResource(
         Long id,
         String email,
         String username,
+        @JsonProperty("account_type")
+        String accountType,
         String status,
         @JsonProperty("email_verified")
         Boolean emailVerified,

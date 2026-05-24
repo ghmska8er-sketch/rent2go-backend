@@ -20,6 +20,7 @@ import app.web.rtgtechnologies.rent2go.iam.interfaces.rest.transform.AuthTokenRe
 import app.web.rtgtechnologies.rent2go.iam.interfaces.rest.transform.LoginCommandFromResourceAssembler;
 import app.web.rtgtechnologies.rent2go.iam.interfaces.rest.transform.RegisterUserCommandFromResourceAssembler;
 import app.web.rtgtechnologies.rent2go.iam.interfaces.rest.transform.UserResourceFromEntityAssembler;
+import jakarta.validation.Valid;
 
 @Tag(name = "Auth", description = "Authentication operations")
 @RestController
@@ -50,7 +51,7 @@ public class UserController {
     }
 
     @PostMapping("/register")
-    public ResponseEntity<UserResource> registerUser(@RequestBody RegisterUserResource resource) {
+    public ResponseEntity<UserResource> registerUser(@Valid @RequestBody RegisterUserResource resource) {
         try {
             RegisterUserCommand command = registerUserAssembler.toCommandFromResource(resource);
             Long userId = userCommandService.handle(command);

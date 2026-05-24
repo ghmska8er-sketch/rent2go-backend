@@ -12,6 +12,7 @@ public class UserResourceFromEntityAssembler {
                 user.getId(),
                 user.getEmail().getValue(),
                 user.getUsername().getValue(),
+                user.getAccountType() == null ? null : user.getAccountType().name(),
                 user.getStatus().toString(),
                 user.getEmailVerified(),
                 user.getTwoFactorEnabled(),

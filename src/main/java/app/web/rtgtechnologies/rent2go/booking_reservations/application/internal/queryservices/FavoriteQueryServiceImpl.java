@@ -17,7 +17,7 @@ public class FavoriteQueryServiceImpl implements FavoriteQueryService {
     private final FavoriteRepository favoriteRepository;
 
     @Override
-    public List<Favorite> findByRenterId(Long renterId) {
-        return favoriteRepository.findAllByRenterId(renterId);
+    public List<Favorite> findByUserId(Long userId) {
+        return favoriteRepository.findAllByUserId(userId);
     }
 }

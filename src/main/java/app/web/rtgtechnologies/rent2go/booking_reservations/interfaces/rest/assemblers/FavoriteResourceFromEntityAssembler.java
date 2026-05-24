@@ -8,6 +8,6 @@ import org.springframework.stereotype.Component;
 public class FavoriteResourceFromEntityAssembler {
 
     public FavoriteResource toResource(Favorite f) {
-        return new FavoriteResource(f.getId(), f.getRenterId(), f.getVehicleId(), f.getCreatedAt());
+        return new FavoriteResource(f.getId(), f.getUserId(), f.getVehicleId(), f.getCreatedAt());
     }
 }

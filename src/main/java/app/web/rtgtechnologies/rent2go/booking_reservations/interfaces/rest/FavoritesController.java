@@ -34,15 +34,15 @@ public class FavoritesController {
 
     @DeleteMapping
     @PreAuthorize("hasRole('USER')")
-    public ResponseEntity<Void> removeFavorite(@RequestParam Long renterId, @RequestParam Long vehicleId) {
-        commandService.handle(new app.web.rtgtechnologies.rent2go.booking_reservations.domain.model.commands.RemoveFavoriteCommand(renterId, vehicleId));
+    public ResponseEntity<Void> removeFavorite(@RequestParam Long userId, @RequestParam Long vehicleId) {
+        commandService.handle(new app.web.rtgtechnologies.rent2go.booking_reservations.domain.model.commands.RemoveFavoriteCommand(userId, vehicleId));
         return ResponseEntity.noContent().build();
     }
 
     @GetMapping
     @PreAuthorize("hasRole('USER')")
-    public ResponseEntity<java.util.List<FavoriteResource>> listFavorites(@RequestParam Long renterId) {
-        var results = queryService.findByRenterId(renterId);
+    public ResponseEntity<java.util.List<FavoriteResource>> listFavorites(@RequestParam Long userId) {
+        var results = queryService.findByUserId(userId);
         var payload = results.stream().map(resourceAssembler::toResource).toList();
         return ResponseEntity.ok(payload);
     }

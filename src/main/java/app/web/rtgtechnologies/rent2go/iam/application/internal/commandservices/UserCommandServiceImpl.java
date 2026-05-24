@@ -8,6 +8,7 @@ import app.web.rtgtechnologies.rent2go.iam.domain.model.commands.LoginCommand;
 import app.web.rtgtechnologies.rent2go.iam.domain.model.commands.RegisterUserCommand;
 import app.web.rtgtechnologies.rent2go.iam.domain.model.commands.VerifyEmailCommand;
 import app.web.rtgtechnologies.rent2go.iam.domain.model.services.UserCommandService;
+import app.web.rtgtechnologies.rent2go.iam.domain.model.valueobjects.AccountType;
 import app.web.rtgtechnologies.rent2go.iam.domain.model.valueobjects.Email;
 import app.web.rtgtechnologies.rent2go.iam.domain.model.valueobjects.Password;
 import app.web.rtgtechnologies.rent2go.iam.domain.model.valueobjects.UserStatus;
@@ -29,6 +30,13 @@ public class UserCommandServiceImpl implements UserCommandService {
 
     @Override
     public Long handle(RegisterUserCommand command) {
+        if (command.accountType() == null) {
+            throw new IllegalArgumentException("Account type is required");
+        }
+        if (command.accountType() != AccountType.OWNER && command.accountType() != AccountType.RENTER) {
+            throw new IllegalArgumentException("Account type must be OWNER or RENTER");
+        }
+
         // Validar que el correo no exista
         if (userRepository.existsByEmail_Value(command.email())) {
             throw new IllegalArgumentException("Email already registered: " + command.email());
@@ -44,7 +52,7 @@ public class UserCommandServiceImpl implements UserCommandService {
         Password password = new Password(command.password());
         Username username = new Username(command.username());
 
-        User user = new User(email, password, username);
+        User user = new User(email, password, username, command.accountType());
 
         // Guardar
         User savedUser = userRepository.save(user);

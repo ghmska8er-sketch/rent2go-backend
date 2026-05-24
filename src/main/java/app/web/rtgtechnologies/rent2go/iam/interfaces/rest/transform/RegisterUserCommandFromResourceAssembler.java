@@ -11,7 +11,8 @@ public class RegisterUserCommandFromResourceAssembler {
         return new RegisterUserCommand(
                 resource.email(),
                 resource.password(),
-                resource.username()
+                resource.username(),
+                resource.accountType()
         );
     }
 }

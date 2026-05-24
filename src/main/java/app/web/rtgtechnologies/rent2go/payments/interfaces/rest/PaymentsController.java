@@ -1,6 +1,8 @@
 package app.web.rtgtechnologies.rent2go.payments.interfaces.rest;
 
 import app.web.rtgtechnologies.rent2go.payments.application.internal.services.FareCalculationServiceImpl;
+import app.web.rtgtechnologies.rent2go.payments.application.internal.services.PromoService;
+import app.web.rtgtechnologies.rent2go.payments.application.internal.services.StripePaymentService;
 import app.web.rtgtechnologies.rent2go.payments.domain.model.valueobjects.Discount;
 import app.web.rtgtechnologies.rent2go.payments.domain.model.valueobjects.Fee;
 import app.web.rtgtechnologies.rent2go.payments.domain.model.valueobjects.Money;
@@ -21,12 +23,12 @@ import java.time.format.DateTimeParseException;
 import java.util.List;
 import java.util.stream.Collectors;
 import com.stripe.exception.StripeException;
-import app.web.rtgtechnologies.rent2go.payments.application.internal.services.StripePaymentService;
 import app.web.rtgtechnologies.rent2go.payments.interfaces.rest.resources.CreateIntentRequest;
 import app.web.rtgtechnologies.rent2go.payments.interfaces.rest.resources.CreateIntentResponse;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.beans.factory.annotation.Value;
+import jakarta.validation.Valid;
 
 
 @RestController
@@ -43,7 +45,7 @@ public class PaymentsController {
     private String stripeWebhookSecret;
 
     @PostMapping("/calculate")
-    public ResponseEntity<MoneyResource> calculateFare(@RequestBody CalculateFareRequest request) {
+    public ResponseEntity<MoneyResource> calculateFare(@Valid @RequestBody CalculateFareRequest request) {
         if (request == null || request.getBaseAmount() == null || request.getCurrency() == null) {
             return ResponseEntity.badRequest().build();
         }
@@ -76,7 +78,7 @@ public class PaymentsController {
 
     @PostMapping("/create-intent")
     @PreAuthorize("hasRole('USER')")
-    public ResponseEntity<CreateIntentResponse> createIntent(@RequestBody CreateIntentRequest request) {
+    public ResponseEntity<CreateIntentResponse> createIntent(@Valid @RequestBody CreateIntentRequest request) {
         try {
             var map = stripePaymentService.createPaymentIntent(request.getReservationId(), request.getAmountCents(), request.getCurrency());
             // persist payment record
@@ -107,7 +109,7 @@ public class PaymentsController {
 
     @PostMapping("/refund")
     @PreAuthorize("hasRole('USER')")
-    public ResponseEntity<String> refund(@RequestBody app.web.rtgtechnologies.rent2go.payments.interfaces.rest.resources.CreateIntentRequest request) {
+    public ResponseEntity<String> refund(@Valid @RequestBody app.web.rtgtechnologies.rent2go.payments.interfaces.rest.resources.CreateIntentRequest request) {
         try {
             // use paymentIntent id from request.reservationId or amountCents as needed; here we expect amountCents and reservationId
             // Find payment record by reservation
@@ -139,7 +141,7 @@ public class PaymentsController {
     }
 
     @GetMapping("/owners/{ownerId}/earnings")
-    @PreAuthorize("hasAnyRole('OWNER','ADMIN')")
+    @PreAuthorize("hasRole('USER')")
     public ResponseEntity<EarningsReportResource> getOwnerEarnings(
             @PathVariable Long ownerId,
             @RequestParam String from,

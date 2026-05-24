@@ -17,6 +17,7 @@ import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
     "app.web.rtgtechnologies.rent2go.booking_reservations.infrastructure.persistence.jpa.repositories",
     "app.web.rtgtechnologies.rent2go.iam.infrastructure.persistence.jpa.repositories",
     "app.web.rtgtechnologies.rent2go.payments.infrastructure.persistence.jpa.repositories",
+    "app.web.rtgtechnologies.rent2go.notifications.infrastructure.persistence.jpa.repositories",
     "app.web.rtgtechnologies.rent2go.community_trust.infrastructure.persistence.jpa.repositories"
 })
 @EnableJpaAuditing

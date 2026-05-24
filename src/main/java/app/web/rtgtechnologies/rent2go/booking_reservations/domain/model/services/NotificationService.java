@@ -8,9 +8,9 @@ package app.web.rtgtechnologies.rent2go.booking_reservations.domain.model.servic
  */
 public interface NotificationService {
 
-    void notifyReservationStatusChanged(Long reservationId, String previousStatus, String newStatus);
+    void notifyReservationStatusChanged(Long reservationId, Long renterId, Long ownerId, String previousStatus, String newStatus);
 
     void notifyReservationCreated(Long reservationId, Long renterId, Long ownerId);
 
-    void notifyReservationCancelled(Long reservationId, String reason);
+    void notifyReservationCancelled(Long reservationId, Long renterId, Long ownerId, String reason);
 }

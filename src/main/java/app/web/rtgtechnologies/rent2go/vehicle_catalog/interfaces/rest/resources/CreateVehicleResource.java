@@ -6,6 +6,7 @@ import lombok.NoArgsConstructor;
 
 import jakarta.validation.constraints.*;
 import java.math.BigDecimal;
+import java.util.List;
 
 /**
  * CreateVehicleResource
@@ -48,6 +49,10 @@ public class CreateVehicleResource {
     private String location;
 
     private String description;
+
+    private List<String> features;
+
+    private String primaryImageUrl;
 
     @NotNull(message = "Number of seats is required")
     @Min(value = 1, message = "Vehicle must have at least 1 seat")

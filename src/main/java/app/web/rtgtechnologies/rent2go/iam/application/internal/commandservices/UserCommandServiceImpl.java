@@ -51,8 +51,11 @@ public class UserCommandServiceImpl implements UserCommandService {
         if (command.accountType() == null) {
             throw new IllegalArgumentException("Account type is required");
         }
-        if (command.accountType() != AccountType.OWNER && command.accountType() != AccountType.RENTER) {
-            throw new IllegalArgumentException("Account type must be OWNER or RENTER");
+        if (command.accountType() != AccountType.OWNER
+                && command.accountType() != AccountType.RENTER
+                && command.accountType() != AccountType.BOTH
+                && command.accountType() != AccountType.ADMIN) {
+            throw new IllegalArgumentException("Account type must be OWNER, RENTER, BOTH or ADMIN");
         }
 
         // Validar que el correo no exista
@@ -70,7 +73,15 @@ public class UserCommandServiceImpl implements UserCommandService {
         Password password = new Password(command.password());
         Username username = new Username(command.username());
 
-        User user = new User(email, password, username, command.accountType());
+        User user = new User(
+            email,
+            password,
+            username,
+            command.fullName(),
+            command.phone(),
+            command.profileImageUrl(),
+            command.accountType()
+        );
 
         // Guardar
         User savedUser = userRepository.save(user);
@@ -137,7 +148,7 @@ public class UserCommandServiceImpl implements UserCommandService {
 
         var now = Instant.now();
         var entity = new app.web.rtgtechnologies.rent2go.iam.infrastructure.persistence.jpa.entities.KycApplication(
-                command.userId(), command.fullName(), command.idNumber(), command.documentUrl(), "PENDING", now
+            command.userId(), command.fullName(), command.idNumber(), command.dniFrontUrl(), command.dniBackUrl(), command.driverLicenseUrl(), "PENDING", now
         );
 
         var saved = kycApplicationRepository.save(entity);

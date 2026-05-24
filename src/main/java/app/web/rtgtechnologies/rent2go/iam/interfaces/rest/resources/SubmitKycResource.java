@@ -7,5 +7,7 @@ public record SubmitKycResource(
         @NotNull Long userId,
         @NotBlank String fullName,
         @NotBlank String idNumber,
-        String documentUrl
+        @NotBlank String dniFrontUrl,
+        @NotBlank String dniBackUrl,
+        String driverLicenseUrl
 ) {}

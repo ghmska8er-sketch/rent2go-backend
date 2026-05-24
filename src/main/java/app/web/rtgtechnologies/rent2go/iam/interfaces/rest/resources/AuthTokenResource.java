@@ -4,6 +4,14 @@ public record AuthTokenResource(
         String token,
         Long userId,
         String email,
-        String username
+        String username,
+        String fullName,
+        String phone,
+        String accountType,
+        String status,
+        Boolean emailVerified,
+        Boolean phoneVerified,
+        Boolean twoFactorEnabled,
+        String profileImageUrl
 ) {
 }

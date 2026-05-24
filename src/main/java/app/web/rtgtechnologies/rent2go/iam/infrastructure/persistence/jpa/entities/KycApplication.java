@@ -20,8 +20,14 @@ public class KycApplication {
     @Column(name = "id_number", nullable = false)
     private String idNumber;
 
-    @Column(name = "document_url")
-    private String documentUrl;
+    @Column(name = "dni_front_url")
+    private String dniFrontUrl;
+
+    @Column(name = "dni_back_url")
+    private String dniBackUrl;
+
+    @Column(name = "driver_license_url")
+    private String driverLicenseUrl;
 
     @Column(name = "status", nullable = false)
     private String status;
@@ -31,11 +37,13 @@ public class KycApplication {
 
     protected KycApplication() {}
 
-    public KycApplication(Long userId, String fullName, String idNumber, String documentUrl, String status, Instant createdAt) {
+    public KycApplication(Long userId, String fullName, String idNumber, String dniFrontUrl, String dniBackUrl, String driverLicenseUrl, String status, Instant createdAt) {
         this.userId = userId;
         this.fullName = fullName;
         this.idNumber = idNumber;
-        this.documentUrl = documentUrl;
+        this.dniFrontUrl = dniFrontUrl;
+        this.dniBackUrl = dniBackUrl;
+        this.driverLicenseUrl = driverLicenseUrl;
         this.status = status;
         this.createdAt = createdAt;
     }
@@ -44,7 +52,9 @@ public class KycApplication {
     public Long getUserId() { return userId; }
     public String getFullName() { return fullName; }
     public String getIdNumber() { return idNumber; }
-    public String getDocumentUrl() { return documentUrl; }
+    public String getDniFrontUrl() { return dniFrontUrl; }
+    public String getDniBackUrl() { return dniBackUrl; }
+    public String getDriverLicenseUrl() { return driverLicenseUrl; }
     public String getStatus() { return status; }
     public Instant getCreatedAt() { return createdAt; }
     public void setStatus(String status) { this.status = status; }

@@ -4,6 +4,8 @@ import app.web.rtgtechnologies.rent2go.booking_reservations.application.internal
 import app.web.rtgtechnologies.rent2go.booking_reservations.application.internal.queryservices.VehicleAvailabilityQueryServiceImpl;
 import app.web.rtgtechnologies.rent2go.booking_reservations.interfaces.rest.assemblers.BlockVehicleCommandFromResourceAssembler;
 import app.web.rtgtechnologies.rent2go.booking_reservations.interfaces.rest.resources.BlockRequestResource;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.AllArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -12,6 +14,7 @@ import org.springframework.web.bind.annotation.*;
 import java.net.URI;
 import java.time.LocalDate;
 
+@Tag(name = "Booking & Reservations", description = "Vehicle availability and calendar blocking operations")
 @RestController
 @RequestMapping("/api/v1/availability")
 @AllArgsConstructor
@@ -23,6 +26,7 @@ public class AvailabilityController {
 
     @PostMapping("/block")
     @PreAuthorize("hasRole('USER')")
+    @Operation(summary = "Block vehicle availability", description = "Blocks a vehicle for a date range so it cannot be reserved.")
     public ResponseEntity<Void> blockVehicle(@RequestBody BlockRequestResource resource) {
         var cmd = assembler.toCommand(resource);
         var saved = commandService.handle(cmd);
@@ -31,12 +35,14 @@ public class AvailabilityController {
 
     @DeleteMapping("/{id}")
     @PreAuthorize("hasRole('USER')")
+    @Operation(summary = "Unblock vehicle availability", description = "Removes a previously created availability block.")
     public ResponseEntity<Void> unblockVehicle(@PathVariable Long id, @RequestParam Long requestedBy) {
         commandService.handle(new app.web.rtgtechnologies.rent2go.booking_reservations.domain.model.commands.UnblockVehicleCommand(id, requestedBy));
         return ResponseEntity.noContent().build();
     }
 
     @GetMapping("/vehicle/{vehicleId}/check")
+    @Operation(summary = "Check vehicle availability", description = "Returns whether a vehicle is available between two dates.")
     public ResponseEntity<Boolean> checkAvailability(@PathVariable Long vehicleId,
                                                      @RequestParam LocalDate startDate,
                                                      @RequestParam LocalDate endDate) {

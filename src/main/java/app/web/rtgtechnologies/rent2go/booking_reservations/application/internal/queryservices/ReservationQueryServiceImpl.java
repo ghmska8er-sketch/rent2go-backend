@@ -59,7 +59,7 @@ public class ReservationQueryServiceImpl implements ReservationQueryService {
 
     @Override
     public Page<Reservation> handle(GetReservationsByOwnerPagedQuery query) {
-        var p = PageRequest.of(Math.max(0, query.page()), Math.max(1, query.size()));
+        var p = PageRequest.of(Math.max(1, query.page()) - 1, Math.max(1, query.size()));
         if (query.status() == null || query.status().isBlank()) {
             return reservationRepository.findAllByOwnerId(query.ownerId(), p);
         }

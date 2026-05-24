@@ -56,14 +56,38 @@ public class Reservation extends AuditableAbstractAggregateRoot<Reservation> {
     @Column(name = "cancelled_at")
     private LocalDateTime cancelledAt;
 
+    @Column(name = "pickup_confirmed_at")
+    private LocalDateTime pickupConfirmedAt;
+
     @Column(name = "returned_at")
     private LocalDateTime returnedAt;
+
+    @Column(name = "return_confirmed_at")
+    private LocalDateTime returnConfirmedAt;
+
+    @Column(name = "damage_report", length = 1000)
+    private String damageReport;
     
     @Column(name = "payment_intent_id")
     private String paymentIntentId;
 
     @Column(name = "paid_at")
     private LocalDateTime paidAt;
+
+    @Column(name = "pickup_location")
+    private String pickupLocation;
+
+    @Column(name = "return_location")
+    private String returnLocation;
+
+    @Column(name = "coverage_plan")
+    private String coveragePlan;
+
+    @Column(name = "pickup_photos", columnDefinition = "TEXT")
+    private String pickupPhotos;
+
+    @Column(name = "return_photos", columnDefinition = "TEXT")
+    private String returnPhotos;
 
     @Builder
     private Reservation(
@@ -127,6 +151,7 @@ public class Reservation extends AuditableAbstractAggregateRoot<Reservation> {
         }
 
         this.status = BookingStatus.ACTIVE();
+        this.pickupConfirmedAt = LocalDateTime.now();
     }
 
     public void complete() {
@@ -135,7 +160,16 @@ public class Reservation extends AuditableAbstractAggregateRoot<Reservation> {
         }
 
         this.status = BookingStatus.COMPLETED();
+        this.returnConfirmedAt = LocalDateTime.now();
         this.returnedAt = LocalDateTime.now();
+    }
+
+    public void expire() {
+        if (this.status.isTerminal()) {
+            throw new IllegalStateException("Terminal reservations cannot expire");
+        }
+
+        this.status = BookingStatus.EXPIRED();
     }
 
     public void cancel() {
@@ -158,6 +192,22 @@ public class Reservation extends AuditableAbstractAggregateRoot<Reservation> {
 
         this.dateRange = newRange;
     }
+
+    public void setDamageReport(String damageReport) {
+        this.damageReport = damageReport;
+    }
+
+    public void setPickupLocation(String pickupLocation) { this.pickupLocation = pickupLocation; }
+    public void setReturnLocation(String returnLocation) { this.returnLocation = returnLocation; }
+    public void setCoveragePlan(String coveragePlan) { this.coveragePlan = coveragePlan; }
+    public void setPickupPhotos(java.util.List<String> photos) { this.pickupPhotos = photos == null ? null : String.join("||", photos); }
+    public void setReturnPhotos(java.util.List<String> photos) { this.returnPhotos = photos == null ? null : String.join("||", photos); }
+
+    public String getPickupLocation() { return pickupLocation; }
+    public String getReturnLocation() { return returnLocation; }
+    public String getCoveragePlan() { return coveragePlan; }
+    public java.util.List<String> getPickupPhotos() { return pickupPhotos == null ? null : java.util.Arrays.asList(pickupPhotos.split("\\|\\|")); }
+    public java.util.List<String> getReturnPhotos() { return returnPhotos == null ? null : java.util.Arrays.asList(returnPhotos.split("\\|\\|")); }
 
     public void markPaid(String paymentIntentId) {
         if (paymentIntentId == null || paymentIntentId.isBlank()) {

@@ -22,19 +22,24 @@ import app.web.rtgtechnologies.rent2go.vehicle_catalog.interfaces.rest.transform
 import app.web.rtgtechnologies.rent2go.vehicle_catalog.interfaces.rest.transform.VehicleImageResourceFromEntityAssembler;
 import app.web.rtgtechnologies.rent2go.vehicle_catalog.interfaces.rest.transform.VehicleResourceFromEntityAssembler;
 import app.web.rtgtechnologies.rent2go.iam.infrastructure.services.JwtTokenProvider;
+import app.web.rtgtechnologies.rent2go.shared.interfaces.rest.resource.PagedResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
 import org.springframework.security.access.prepost.PreAuthorize;
 import lombok.AllArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.validation.annotation.Validated;
 
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.stream.Collectors;
+import java.util.function.Function;
 
 /**
  * VehicleController
@@ -49,7 +54,8 @@ import java.util.stream.Collectors;
 @RestController
 @RequestMapping("/api/v1/vehicles")
 @AllArgsConstructor
-@Tag(name = "Vehicles", description = "Vehicle Catalog Management API")
+@Validated
+@Tag(name = "Vehicle Catalog", description = "Operations for managing vehicles, pricing, details and images")
 public class VehicleController {
 
     private final VehicleCommandService vehicleCommandService;
@@ -90,17 +96,15 @@ public class VehicleController {
     @GetMapping("/me")
     @PreAuthorize("hasRole('USER')")
     @Operation(summary = "Get my published vehicles")
-    public ResponseEntity<List<VehicleResource>> getMyVehicles(
-        @RequestHeader(value = "Authorization", required = false) String authHeader
+    public ResponseEntity<PagedResponse<VehicleResource>> getMyVehicles(
+        @RequestHeader(value = "Authorization", required = false) String authHeader,
+        @RequestParam(defaultValue = "0") @Min(value = 0, message = "Page must be greater than or equal to 0") int page,
+        @RequestParam(defaultValue = "20") @Min(value = 1, message = "Size must be greater than 0") @Max(value = 100, message = "Size must be at most 100") int size
     ) {
         Long ownerId = extractUserIdFromAuthHeader(authHeader);
 
         List<Vehicle> vehicles = vehicleQueryService.handle(new GetVehiclesByOwnerQuery(ownerId));
-        List<VehicleResource> response = vehicles.stream()
-            .map(VehicleResourceFromEntityAssembler::toResource)
-            .collect(Collectors.toList());
-
-        return ResponseEntity.ok(response);
+        return ResponseEntity.ok(toPagedResponse(vehicles, page, size, VehicleResourceFromEntityAssembler::toResource));
     }
 
     /**
@@ -126,7 +130,7 @@ public class VehicleController {
      */
     @GetMapping
     @Operation(summary = "Search available vehicles")
-    public ResponseEntity<List<VehicleResource>> searchAvailableVehicles(
+    public ResponseEntity<PagedResponse<VehicleResource>> searchAvailableVehicles(
         @RequestParam(required = false) List<String> categories,
         @RequestParam(required = false) BigDecimal minPrice,
         @RequestParam(required = false) BigDecimal maxPrice,
@@ -135,7 +139,9 @@ public class VehicleController {
         @RequestParam(required = false) Integer seats,
         @RequestParam(required = false) String transmission,
         @RequestParam(required = false) String fuelType,
-        @RequestParam(required = false) String location
+        @RequestParam(required = false) String location,
+        @RequestParam(defaultValue = "0") @Min(value = 0, message = "Page must be greater than or equal to 0") int page,
+        @RequestParam(defaultValue = "20") @Min(value = 1, message = "Size must be greater than 0") @Max(value = 100, message = "Size must be at most 100") int size
     ) {
         SearchCriteria criteria = SearchCriteria.full(
             categories,
@@ -150,11 +156,7 @@ public class VehicleController {
         );
 
         List<Vehicle> vehicles = vehicleQueryService.handle(new SearchVehiclesByCriteriaQuery(criteria));
-        List<VehicleResource> response = vehicles.stream()
-            .map(VehicleResourceFromEntityAssembler::toResource)
-            .collect(Collectors.toList());
-
-        return ResponseEntity.ok(response);
+        return ResponseEntity.ok(toPagedResponse(vehicles, page, size, VehicleResourceFromEntityAssembler::toResource));
     }
 
     /**
@@ -269,15 +271,13 @@ public class VehicleController {
      */
     @GetMapping("/{id}/images")
     @Operation(summary = "Get all vehicle images")
-    public ResponseEntity<List<VehicleImageResource>> getVehicleImages(
-        @PathVariable Long id
+    public ResponseEntity<PagedResponse<VehicleImageResource>> getVehicleImages(
+        @PathVariable Long id,
+        @RequestParam(defaultValue = "1") @Min(value = 1, message = "Page must be greater than or equal to 1") int page,
+        @RequestParam(defaultValue = "20") @Min(value = 1, message = "Size must be greater than 0") @Max(value = 100, message = "Size must be at most 100") int size
     ) {
         List<VehicleImage> images = vehicleQueryService.handle(new GetVehicleImagesQuery(id));
-        List<VehicleImageResource> response = images.stream()
-            .map(VehicleImageResourceFromEntityAssembler::toResource)
-            .collect(Collectors.toList());
-
-        return ResponseEntity.ok(response);
+        return ResponseEntity.ok(toPagedResponse(images, page, size, VehicleImageResourceFromEntityAssembler::toResource));
     }
 
     private Long extractUserIdFromAuthHeader(String authHeader) {
@@ -287,5 +287,16 @@ public class VehicleController {
 
         String token = authHeader.substring(7);
         return jwtTokenProvider.extractUserIdFromToken(token);
+    }
+
+    private <T, R> PagedResponse<R> toPagedResponse(List<T> source, int page, int size, Function<T, R> mapper) {
+        int safePage = Math.max(1, page);
+        int safeSize = Math.max(1, size);
+        long totalElements = source.size();
+        int fromIndex = Math.min((safePage - 1) * safeSize, source.size());
+        int toIndex = Math.min(fromIndex + safeSize, source.size());
+        List<R> content = source.subList(fromIndex, toIndex).stream().map(mapper).collect(Collectors.toList());
+        int totalPages = totalElements == 0 ? 0 : (int) Math.ceil((double) totalElements / safeSize);
+        return new PagedResponse<>(content, safePage, safeSize, totalElements, totalPages);
     }
 }

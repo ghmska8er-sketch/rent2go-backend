@@ -38,6 +38,17 @@ public class ReservationCommandServiceImpl implements ReservationCommandService 
             command.totalAmount()
         );
 
+        // Apply optional pickup/return metadata if provided
+        try {
+            reservation.setPickupLocation(command.pickupLocation());
+            reservation.setReturnLocation(command.returnLocation());
+            reservation.setCoveragePlan(command.coveragePlan());
+            reservation.setPickupPhotos(command.pickupPhotos());
+            reservation.setReturnPhotos(command.returnPhotos());
+        } catch (Exception ex) {
+            // ignore metadata errors to avoid blocking reservation creation
+        }
+
         var saved = reservationRepository.save(reservation);
         try {
             notificationService.notifyReservationCreated(saved.getId(), saved.getRenterId(), saved.getOwnerId());
@@ -58,7 +69,7 @@ public class ReservationCommandServiceImpl implements ReservationCommandService 
         reservation.cancel();
         var saved = reservationRepository.save(reservation);
         try {
-            notificationService.notifyReservationCancelled(saved.getId(), "Cancelled by renter");
+            notificationService.notifyReservationCancelled(saved.getId(), saved.getRenterId(), saved.getOwnerId(), "Cancelled by renter");
         } catch (Exception ex) {
         }
         return saved;
@@ -127,7 +138,7 @@ public class ReservationCommandServiceImpl implements ReservationCommandService 
 
         var saved = reservationRepository.save(reservation);
         try {
-            notificationService.notifyReservationStatusChanged(saved.getId(), previous, saved.getStatus().getStatus());
+            notificationService.notifyReservationStatusChanged(saved.getId(), saved.getRenterId(), saved.getOwnerId(), previous, saved.getStatus().getStatus());
         } catch (Exception ex) {
         }
 
@@ -155,7 +166,7 @@ public class ReservationCommandServiceImpl implements ReservationCommandService 
         reservation.complete();
         var saved = reservationRepository.save(reservation);
         try {
-            notificationService.notifyReservationStatusChanged(saved.getId(), "ACTIVE", "COMPLETED");
+            notificationService.notifyReservationStatusChanged(saved.getId(), saved.getRenterId(), saved.getOwnerId(), "ACTIVE", "COMPLETED");
         } catch (Exception ex) {
         }
 

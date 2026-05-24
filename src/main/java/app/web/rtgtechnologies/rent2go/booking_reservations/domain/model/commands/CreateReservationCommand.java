@@ -15,5 +15,10 @@ public record CreateReservationCommand(
     LocalDate startDate,
     LocalDate endDate,
     BigDecimal totalAmount
-) {
+    , String pickupLocation,
+    String returnLocation,
+    String coveragePlan,
+    java.util.List<String> pickupPhotos,
+    java.util.List<String> returnPhotos
+    ) {
 }

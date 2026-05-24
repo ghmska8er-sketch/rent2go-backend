@@ -15,6 +15,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.validation.annotation.Validated;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -25,15 +26,21 @@ import java.util.stream.Collectors;
 import com.stripe.exception.StripeException;
 import app.web.rtgtechnologies.rent2go.payments.interfaces.rest.resources.CreateIntentRequest;
 import app.web.rtgtechnologies.rent2go.payments.interfaces.rest.resources.CreateIntentResponse;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.beans.factory.annotation.Value;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Positive;
 
 
+@Tag(name = "Payments", description = "Fare calculation, payment intents, refunds and earnings reports")
 @RestController
 @RequestMapping("/api/v1/payments")
 @RequiredArgsConstructor
+@Validated
 public class PaymentsController {
 
     private final FareCalculationServiceImpl fareCalculationService;
@@ -45,12 +52,11 @@ public class PaymentsController {
     private String stripeWebhookSecret;
 
     @PostMapping("/calculate")
+    @Operation(summary = "Calculate fare", description = "Calculates the trip total by applying fees, discounts and promo codes.")
     public ResponseEntity<MoneyResource> calculateFare(@Valid @RequestBody CalculateFareRequest request) {
-        if (request == null || request.getBaseAmount() == null || request.getCurrency() == null) {
-            return ResponseEntity.badRequest().build();
-        }
-
         Money base = Money.of(request.getBaseAmount(), request.getCurrency());
+
+        BigDecimal subtotal = request.getBaseAmount();
 
         List<Fee> fees = request.getFees() == null ? List.of() : request.getFees().stream()
                 .map(f -> Fee.of(f.getCode(), f.getAmount()))
@@ -72,12 +78,41 @@ public class PaymentsController {
         }
 
         Money result = fareCalculationService.calculate(base, fees, discounts);
+        BigDecimal serviceFee = BigDecimal.ZERO;
+        BigDecimal coverageFee = BigDecimal.ZERO;
+        BigDecimal taxes = BigDecimal.ZERO;
+
+        for (Fee fee : fees) {
+            if (fee == null || fee.getAmount() == null) {
+                continue;
+            }
+
+            String code = fee.getCode() == null ? "" : fee.getCode().toLowerCase();
+            if (code.contains("coverage") || code.contains("insurance")) {
+                coverageFee = coverageFee.add(fee.getAmount());
+            } else if (code.contains("tax")) {
+                taxes = taxes.add(fee.getAmount());
+            } else {
+                serviceFee = serviceFee.add(fee.getAmount());
+            }
+        }
+
+        BigDecimal totalBeforeDiscount = subtotal.add(serviceFee).add(coverageFee).add(taxes);
+        BigDecimal discountAmount = totalBeforeDiscount.subtract(result.getAmount());
+
         MoneyResource res = new MoneyResource(result.getAmount(), result.getCurrency());
+        res.setSubtotal(subtotal);
+        res.setServiceFee(serviceFee);
+        res.setCoverageFee(coverageFee);
+        res.setTaxes(taxes);
+        res.setDiscount(discountAmount.max(BigDecimal.ZERO));
+        res.setTotal(result.getAmount());
         return ResponseEntity.ok(res);
     }
 
     @PostMapping("/create-intent")
     @PreAuthorize("hasRole('USER')")
+    @Operation(summary = "Create payment intent", description = "Creates a Stripe payment intent for a reservation and stores the payment record.")
     public ResponseEntity<CreateIntentResponse> createIntent(@Valid @RequestBody CreateIntentRequest request) {
         try {
             var map = stripePaymentService.createPaymentIntent(request.getReservationId(), request.getAmountCents(), request.getCurrency());
@@ -90,6 +125,7 @@ public class PaymentsController {
     }
 
     @PostMapping(value = "/webhook", consumes = MediaType.APPLICATION_JSON_VALUE)
+    @Operation(summary = "Stripe webhook", description = "Receives Stripe events and synchronizes payment status in the backend.")
     public ResponseEntity<String> webhook(@RequestBody String payload, @RequestHeader("Stripe-Signature") String sigHeader) {
         try {
             var event = stripePaymentService.constructEvent(payload, sigHeader);
@@ -109,6 +145,7 @@ public class PaymentsController {
 
     @PostMapping("/refund")
     @PreAuthorize("hasRole('USER')")
+    @Operation(summary = "Refund payment", description = "Requests a refund for a reservation payment and updates the payment status.")
     public ResponseEntity<String> refund(@Valid @RequestBody app.web.rtgtechnologies.rent2go.payments.interfaces.rest.resources.CreateIntentRequest request) {
         try {
             // use paymentIntent id from request.reservationId or amountCents as needed; here we expect amountCents and reservationId
@@ -126,6 +163,7 @@ public class PaymentsController {
 
     @GetMapping("/reservations/{reservationId}/receipt")
     @PreAuthorize("hasRole('USER')")
+    @Operation(summary = "Get payment receipt", description = "Returns the receipt and status for a reservation payment.")
     public ResponseEntity<app.web.rtgtechnologies.rent2go.payments.interfaces.rest.resources.PaymentReceiptResource> getReceipt(@PathVariable Long reservationId) {
         var opt = paymentsService.findByReservationId(reservationId);
         if (opt.isEmpty()) return ResponseEntity.notFound().build();
@@ -142,10 +180,11 @@ public class PaymentsController {
 
     @GetMapping("/owners/{ownerId}/earnings")
     @PreAuthorize("hasRole('USER')")
+    @Operation(summary = "Get owner earnings", description = "Returns earnings and payout totals for an owner within a date range.")
     public ResponseEntity<EarningsReportResource> getOwnerEarnings(
-            @PathVariable Long ownerId,
-            @RequestParam String from,
-            @RequestParam String to) {
+            @PathVariable @Positive(message = "Owner ID must be positive") Long ownerId,
+            @RequestParam @NotBlank(message = "From date is required") String from,
+            @RequestParam @NotBlank(message = "To date is required") String to) {
         try {
             var fromDate = LocalDate.parse(from).atStartOfDay();
             var toDate = LocalDate.parse(to).atTime(23, 59, 59);
@@ -161,7 +200,12 @@ public class PaymentsController {
             resource.setTo(to);
             resource.setCurrency("USD");
             resource.setTotalAmountCents(totalCents != null ? totalCents : 0L);
+            resource.setAvailablePayoutCents(totalCents != null ? totalCents : 0L);
+            resource.setPendingPayoutCents(0L);
             resource.setPaymentsCount(paymentCount != null ? paymentCount : 0L);
+            // Provide UI-friendly fields
+            resource.setAvailableNowCents(resource.getAvailablePayoutCents());
+            resource.setNextPayoutDate(java.time.LocalDate.now().plusDays(7).toString());
             return ResponseEntity.ok(resource);
         } catch (DateTimeParseException ex) {
             return ResponseEntity.badRequest().build();

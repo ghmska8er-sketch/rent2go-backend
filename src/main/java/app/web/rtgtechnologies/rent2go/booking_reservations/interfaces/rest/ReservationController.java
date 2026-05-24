@@ -18,6 +18,8 @@ import app.web.rtgtechnologies.rent2go.booking_reservations.interfaces.rest.asse
 import app.web.rtgtechnologies.rent2go.booking_reservations.interfaces.rest.resources.ConfirmReturnResource;
 import app.web.rtgtechnologies.rent2go.booking_reservations.domain.model.commands.CreateReservationCommand;
 import app.web.rtgtechnologies.rent2go.shared.interfaces.rest.resource.PagedResponse;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.AllArgsConstructor;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
@@ -32,6 +34,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.function.Function;
 
+@Tag(name = "Booking & Reservations", description = "Reservation lifecycle operations and renter/owner views")
 @RestController
 @RequestMapping("/api/v1/reservations")
 @AllArgsConstructor
@@ -48,6 +51,7 @@ public class ReservationController {
     private final ConfirmReturnCommandFromResourceAssembler confirmReturnAssembler;
 
     @PostMapping
+    @Operation(summary = "Create reservation", description = "Creates a new reservation for a vehicle and renter.")
     public ResponseEntity<ReservationResource> createReservation(@RequestBody @Valid CreateReservationResource resource) {
         CreateReservationCommand command = commandAssembler.toCommand(resource);
         Reservation saved = commandService.handle(command);
@@ -56,6 +60,7 @@ public class ReservationController {
     }
 
     @GetMapping("/{id}")
+    @Operation(summary = "Get reservation by id", description = "Returns the reservation details for a single reservation identifier.")
     public ResponseEntity<ReservationResource> getReservationById(@PathVariable Long id) {
         Optional<Reservation> found = queryService.handle(new GetReservationByIdQuery(id));
         return found.map(res -> ResponseEntity.ok(resourceAssembler.toResource(res)))
@@ -63,6 +68,7 @@ public class ReservationController {
     }
 
     @PostMapping("/{id}/cancel")
+    @Operation(summary = "Cancel reservation", description = "Cancels an existing reservation using the cancellation reason and actor data.")
     public ResponseEntity<ReservationResource> cancelReservation(@PathVariable Long id, @RequestBody @Valid CancelReservationResource resource) {
         var command = cancelAssembler.toCommand(id, resource);
         var canceled = commandService.handle(command);
@@ -70,6 +76,7 @@ public class ReservationController {
     }
 
     @PatchMapping("/{id}")
+    @Operation(summary = "Modify reservation", description = "Updates reservation dates or details when the business rules allow it.")
     public ResponseEntity<ReservationResource> modifyReservation(@PathVariable Long id, @RequestBody @Valid ModifyReservationResource resource) {
         var command = modifyAssembler.toCommand(id, resource);
         var updated = commandService.handle(command);
@@ -77,6 +84,7 @@ public class ReservationController {
     }
 
     @PostMapping("/{id}/status")
+    @Operation(summary = "Update reservation status", description = "Transitions a reservation to another allowed status.")
     public ResponseEntity<ReservationResource> updateReservationStatus(@PathVariable Long id, @RequestBody @Valid UpdateReservationStatusResource resource) {
         var command = updateStatusAssembler.toCommand(id, resource);
         var updated = commandService.handle(command);
@@ -84,6 +92,7 @@ public class ReservationController {
     }
 
     @PostMapping("/{id}/confirm-return")
+    @Operation(summary = "Confirm vehicle return", description = "Marks the reservation as returned and records the confirmation details.")
     public ResponseEntity<ReservationResource> confirmReturn(@PathVariable Long id, @RequestBody @Valid ConfirmReturnResource resource) {
         var command = confirmReturnAssembler.toCommand(id, resource);
         var updated = commandService.handle(command);
@@ -91,6 +100,7 @@ public class ReservationController {
     }
 
     @GetMapping
+    @Operation(summary = "List renter reservations", description = "Returns the renter's reservations, optionally filtered by status. Page starts at 1.")
     public ResponseEntity<PagedResponse<ReservationResource>> listByRenter(
             @RequestParam @Positive(message = "Renter ID must be positive") Long renterId,
             @RequestParam(required = false) String status,
@@ -102,6 +112,7 @@ public class ReservationController {
     }
 
     @GetMapping("/owner")
+    @Operation(summary = "List owner reservations", description = "Returns reservations for a vehicle owner, optionally filtered by status. Page starts at 1.")
     public ResponseEntity<PagedResponse<ReservationResource>> listByOwner(
             @RequestParam @Positive(message = "Owner ID must be positive") Long ownerId,
             @RequestParam(required = false) String status,
@@ -113,6 +124,7 @@ public class ReservationController {
     }
 
     @GetMapping("/renter/{renterId}/history")
+    @Operation(summary = "Get renter history", description = "Returns the completed reservation history for a renter. Page starts at 1.")
     public ResponseEntity<PagedResponse<ReservationResource>> getRenterHistory(
             @PathVariable @Positive(message = "Renter ID must be positive") Long renterId,
             @RequestParam(defaultValue = "1") @Min(value = 1, message = "Page must be greater than or equal to 1") int page,
@@ -123,6 +135,7 @@ public class ReservationController {
     }
 
     @GetMapping("/owner/paged")
+    @Operation(summary = "List owner reservations paged", description = "Returns owner reservations using repository pagination. Page starts at 1 in the API.")
     public ResponseEntity<PagedResponse<ReservationResource>> listByOwnerPaged(
             @RequestParam @Positive(message = "Owner ID must be positive") Long ownerId,
             @RequestParam(required = false) String status,

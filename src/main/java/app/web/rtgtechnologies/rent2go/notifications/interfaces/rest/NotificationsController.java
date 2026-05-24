@@ -9,6 +9,8 @@ import app.web.rtgtechnologies.rent2go.notifications.interfaces.rest.assemblers.
 import app.web.rtgtechnologies.rent2go.notifications.interfaces.rest.resources.DeviceTokenResource;
 import app.web.rtgtechnologies.rent2go.notifications.interfaces.rest.resources.RegisterDeviceTokenResource;
 import jakarta.validation.Valid;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -16,6 +18,7 @@ import org.springframework.web.bind.annotation.*;
 import java.net.URI;
 import java.util.List;
 
+@Tag(name = "Notifications", description = "Device token registration and notification delivery support")
 @RestController
 @RequestMapping("/api/v1/notifications")
 @RequiredArgsConstructor
@@ -25,6 +28,7 @@ public class NotificationsController {
     private final DeviceTokenQueryServiceImpl queryService;
 
     @PostMapping("/device-tokens")
+    @Operation(summary = "Register device token", description = "Stores or refreshes a push notification token for a user's device.")
     public ResponseEntity<DeviceTokenResource> registerDeviceToken(@Valid @RequestBody RegisterDeviceTokenResource resource) {
         var command = RegisterDeviceTokenCommandFromResourceAssembler.toCommand(resource);
         var saved = commandService.handle(command).orElseThrow();
@@ -33,12 +37,14 @@ public class NotificationsController {
     }
 
     @GetMapping("/users/{userId}/device-tokens")
+    @Operation(summary = "List device tokens", description = "Returns all device tokens registered for a user.")
     public ResponseEntity<List<DeviceTokenResource>> getDeviceTokensByUser(@PathVariable Long userId) {
         var results = queryService.handle(new GetDeviceTokensByUserQuery(userId));
         return ResponseEntity.ok(results.stream().map(DeviceTokenResourceFromEntityAssembler::toResource).toList());
     }
 
     @DeleteMapping("/users/{userId}/device-tokens/{deviceTokenId}")
+    @Operation(summary = "Unregister device token", description = "Deletes a previously registered device token for the specified user.")
     public ResponseEntity<Void> unregisterDeviceToken(@PathVariable Long userId, @PathVariable Long deviceTokenId) {
         var deleted = commandService.handle(new UnregisterDeviceTokenCommand(deviceTokenId, userId));
         return deleted ? ResponseEntity.noContent().build() : ResponseEntity.notFound().build();

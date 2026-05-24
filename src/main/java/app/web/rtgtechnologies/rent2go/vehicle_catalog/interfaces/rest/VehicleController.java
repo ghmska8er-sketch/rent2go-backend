@@ -55,7 +55,7 @@ import java.util.function.Function;
 @RequestMapping("/api/v1/vehicles")
 @AllArgsConstructor
 @Validated
-@Tag(name = "Vehicles", description = "Vehicle Catalog Management API")
+@Tag(name = "Vehicle Catalog", description = "Operations for managing vehicles, pricing, details and images")
 public class VehicleController {
 
     private final VehicleCommandService vehicleCommandService;

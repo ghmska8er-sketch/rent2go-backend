@@ -26,6 +26,8 @@ import java.util.stream.Collectors;
 import com.stripe.exception.StripeException;
 import app.web.rtgtechnologies.rent2go.payments.interfaces.rest.resources.CreateIntentRequest;
 import app.web.rtgtechnologies.rent2go.payments.interfaces.rest.resources.CreateIntentResponse;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.beans.factory.annotation.Value;
@@ -34,6 +36,7 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Positive;
 
 
+@Tag(name = "Payments", description = "Fare calculation, payment intents, refunds and earnings reports")
 @RestController
 @RequestMapping("/api/v1/payments")
 @RequiredArgsConstructor
@@ -49,6 +52,7 @@ public class PaymentsController {
     private String stripeWebhookSecret;
 
     @PostMapping("/calculate")
+    @Operation(summary = "Calculate fare", description = "Calculates the trip total by applying fees, discounts and promo codes.")
     public ResponseEntity<MoneyResource> calculateFare(@Valid @RequestBody CalculateFareRequest request) {
         Money base = Money.of(request.getBaseAmount(), request.getCurrency());
 
@@ -108,6 +112,7 @@ public class PaymentsController {
 
     @PostMapping("/create-intent")
     @PreAuthorize("hasRole('USER')")
+    @Operation(summary = "Create payment intent", description = "Creates a Stripe payment intent for a reservation and stores the payment record.")
     public ResponseEntity<CreateIntentResponse> createIntent(@Valid @RequestBody CreateIntentRequest request) {
         try {
             var map = stripePaymentService.createPaymentIntent(request.getReservationId(), request.getAmountCents(), request.getCurrency());
@@ -120,6 +125,7 @@ public class PaymentsController {
     }
 
     @PostMapping(value = "/webhook", consumes = MediaType.APPLICATION_JSON_VALUE)
+    @Operation(summary = "Stripe webhook", description = "Receives Stripe events and synchronizes payment status in the backend.")
     public ResponseEntity<String> webhook(@RequestBody String payload, @RequestHeader("Stripe-Signature") String sigHeader) {
         try {
             var event = stripePaymentService.constructEvent(payload, sigHeader);
@@ -139,6 +145,7 @@ public class PaymentsController {
 
     @PostMapping("/refund")
     @PreAuthorize("hasRole('USER')")
+    @Operation(summary = "Refund payment", description = "Requests a refund for a reservation payment and updates the payment status.")
     public ResponseEntity<String> refund(@Valid @RequestBody app.web.rtgtechnologies.rent2go.payments.interfaces.rest.resources.CreateIntentRequest request) {
         try {
             // use paymentIntent id from request.reservationId or amountCents as needed; here we expect amountCents and reservationId
@@ -156,6 +163,7 @@ public class PaymentsController {
 
     @GetMapping("/reservations/{reservationId}/receipt")
     @PreAuthorize("hasRole('USER')")
+    @Operation(summary = "Get payment receipt", description = "Returns the receipt and status for a reservation payment.")
     public ResponseEntity<app.web.rtgtechnologies.rent2go.payments.interfaces.rest.resources.PaymentReceiptResource> getReceipt(@PathVariable Long reservationId) {
         var opt = paymentsService.findByReservationId(reservationId);
         if (opt.isEmpty()) return ResponseEntity.notFound().build();
@@ -172,6 +180,7 @@ public class PaymentsController {
 
     @GetMapping("/owners/{ownerId}/earnings")
     @PreAuthorize("hasRole('USER')")
+    @Operation(summary = "Get owner earnings", description = "Returns earnings and payout totals for an owner within a date range.")
     public ResponseEntity<EarningsReportResource> getOwnerEarnings(
             @PathVariable @Positive(message = "Owner ID must be positive") Long ownerId,
             @RequestParam @NotBlank(message = "From date is required") String from,

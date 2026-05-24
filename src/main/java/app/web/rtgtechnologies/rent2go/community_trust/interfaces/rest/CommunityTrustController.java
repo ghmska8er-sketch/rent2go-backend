@@ -46,6 +46,8 @@ import app.web.rtgtechnologies.rent2go.community_trust.interfaces.rest.resources
 import app.web.rtgtechnologies.rent2go.community_trust.interfaces.rest.resources.UserReputationResource;
 import app.web.rtgtechnologies.rent2go.community_trust.interfaces.rest.resources.VehicleRatingResource;
 import jakarta.validation.Valid;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -53,6 +55,7 @@ import org.springframework.web.bind.annotation.*;
 import java.net.URI;
 import java.util.List;
 
+@Tag(name = "Community & Trust", description = "Reviews, conversations, reports, disputes and trust dashboards")
 @RestController
 @RequestMapping("/api/v1/community-trust")
 @RequiredArgsConstructor
@@ -74,6 +77,7 @@ public class CommunityTrustController {
     private final MessageResourceFromEntityAssembler messageAssembler;
 
     @PostMapping("/reviews")
+    @Operation(summary = "Submit review", description = "Creates a new review for a reservation, vehicle or interaction.")
     public ResponseEntity<ReviewResource> submitReview(@Valid @RequestBody SubmitReviewResource resource) {
         SubmitReviewCommand command = submitAssembler.toCommand(resource);
         var saved = commandService.handle(command);
@@ -82,6 +86,7 @@ public class CommunityTrustController {
     }
 
     @PostMapping("/reviews/{reviewId}/flag")
+    @Operation(summary = "Flag review", description = "Flags a review so moderators can inspect it.")
     public ResponseEntity<ReviewResource> flagReview(@PathVariable Long reviewId, @Valid @RequestBody FlagReviewResource resource) {
         FlagReviewCommand command = flagAssembler.toCommand(reviewId, resource);
         var saved = commandService.handle(command);
@@ -89,6 +94,7 @@ public class CommunityTrustController {
     }
 
     @PostMapping("/reviews/{reviewId}/approve")
+    @Operation(summary = "Approve review", description = "Marks a flagged review as approved by moderation.")
     public ResponseEntity<ReviewResource> approveReview(@PathVariable Long reviewId, @Valid @RequestBody ModerationActionResource resource) {
         ApproveReviewCommand command = moderationAssembler.toApproveCommand(reviewId, resource);
         var saved = commandService.handle(command);
@@ -96,6 +102,7 @@ public class CommunityTrustController {
     }
 
     @PostMapping("/reviews/{reviewId}/reject")
+    @Operation(summary = "Reject review", description = "Marks a review as rejected and records the moderation note.")
     public ResponseEntity<ReviewResource> rejectReview(@PathVariable Long reviewId, @Valid @RequestBody ModerationActionResource resource) {
         RejectReviewCommand command = moderationAssembler.toRejectCommand(reviewId, resource);
         var saved = commandService.handle(command);
@@ -103,18 +110,21 @@ public class CommunityTrustController {
     }
 
     @GetMapping("/reviews/vehicle/{vehicleId}")
+    @Operation(summary = "List vehicle reviews", description = "Returns all reviews for a given vehicle.")
     public ResponseEntity<List<ReviewResource>> getReviewsByVehicle(@PathVariable Long vehicleId) {
         var results = queryService.handle(new GetReviewsByVehicleQuery(vehicleId));
         return ResponseEntity.ok(results.stream().map(reviewAssembler::toResource).toList());
     }
 
     @GetMapping("/reviews/user/{userId}")
+    @Operation(summary = "List user reviews", description = "Returns all reviews written about a given user.")
     public ResponseEntity<List<ReviewResource>> getReviewsByUser(@PathVariable Long userId) {
         var results = queryService.handle(new GetReviewsByUserQuery(userId));
         return ResponseEntity.ok(results.stream().map(reviewAssembler::toResource).toList());
     }
 
     @GetMapping("/users/{userId}/reputation")
+    @Operation(summary = "Get user reputation", description = "Returns the trust score and moderation state for a user.")
     public ResponseEntity<UserReputationResource> getUserReputation(@PathVariable Long userId) {
         return queryService.handle(new GetUserReputationQuery(userId))
             .map(rep -> ResponseEntity.ok(new UserReputationResource(
@@ -129,6 +139,7 @@ public class CommunityTrustController {
     }
 
     @GetMapping("/dashboard")
+    @Operation(summary = "Get trust dashboard", description = "Returns the global trust metrics dashboard for administrators.")
     public ResponseEntity<CommunityTrustDashboardResource> getDashboard() {
         var dashboard = queryService.handle(new GetCommunityTrustDashboardQuery());
         return ResponseEntity.ok(new CommunityTrustDashboardResource(
@@ -146,6 +157,7 @@ public class CommunityTrustController {
     }
 
     @GetMapping("/vehicles/{vehicleId}/rating")
+    @Operation(summary = "Get vehicle rating", description = "Returns the average rating and count for a vehicle.")
     public ResponseEntity<VehicleRatingResource> getVehicleRating(@PathVariable Long vehicleId) {
         var reviews = queryService.handle(new GetReviewsByVehicleQuery(vehicleId));
         var approved = reviews.stream().filter(review -> review.getStatus() != null && review.getStatus().isApproved()).toList();
@@ -158,6 +170,7 @@ public class CommunityTrustController {
     }
 
     @PostMapping("/users/{userId}/block")
+    @Operation(summary = "Block user", description = "Blocks a user and records the moderation reason.")
     public ResponseEntity<Void> blockUser(@PathVariable Long userId, @Valid @RequestBody BlockUserResource resource) {
         BlockUserForTrustCommand command = blockAssembler.toCommand(userId, resource);
         commandService.handle(command);
@@ -165,6 +178,7 @@ public class CommunityTrustController {
     }
 
     @PostMapping("/reservations/{reservationId}/disputes")
+    @Operation(summary = "Open reservation dispute", description = "Creates a trust dispute linked to a reservation.")
     public ResponseEntity<TrustReportResource> openReservationDispute(@PathVariable Long reservationId, @Valid @RequestBody OpenReservationDisputeResource resource) {
         OpenReservationDisputeCommand command = disputeAssembler.toCommand(reservationId, resource);
         var saved = commandService.handle(command);
@@ -186,6 +200,7 @@ public class CommunityTrustController {
     }
 
     @PostMapping("/conversations")
+    @Operation(summary = "Start conversation", description = "Starts a conversation between renter and owner.")
     public ResponseEntity<ConversationResource> startConversation(@Valid @RequestBody StartConversationResource resource) {
         StartConversationCommand command = startConversationAssembler.toCommand(resource);
         var saved = conversationCommandService.handle(command);
@@ -194,6 +209,7 @@ public class CommunityTrustController {
     }
 
     @GetMapping("/conversations/{conversationId}")
+    @Operation(summary = "Get conversation", description = "Returns a conversation by its identifier.")
     public ResponseEntity<ConversationResource> getConversation(@PathVariable Long conversationId) {
         return conversationQueryService.handle(new GetConversationByIdQuery(conversationId))
             .map(conversation -> ResponseEntity.ok(conversationAssembler.toResource(conversation)))
@@ -201,12 +217,14 @@ public class CommunityTrustController {
     }
 
     @GetMapping("/users/{userId}/conversations")
+    @Operation(summary = "List user conversations", description = "Returns conversations associated with a specific user.")
     public ResponseEntity<List<ConversationResource>> getConversationsByUser(@PathVariable Long userId) {
         var results = conversationQueryService.handle(new GetConversationsByUserQuery(userId));
         return ResponseEntity.ok(results.stream().map(conversationAssembler::toResource).toList());
     }
 
     @PostMapping("/conversations/{conversationId}/messages")
+    @Operation(summary = "Send message", description = "Adds a message to an existing conversation.")
     public ResponseEntity<MessageResource> sendMessage(@PathVariable Long conversationId, @Valid @RequestBody SendMessageResource resource) {
         SendMessageCommand command = sendMessageAssembler.toCommand(conversationId, resource);
         var saved = conversationCommandService.handle(command);
@@ -215,12 +233,14 @@ public class CommunityTrustController {
     }
 
     @GetMapping("/conversations/{conversationId}/messages")
+    @Operation(summary = "List conversation messages", description = "Returns all messages in a conversation.")
     public ResponseEntity<List<MessageResource>> getMessagesByConversation(@PathVariable Long conversationId) {
         var results = conversationQueryService.handle(new GetMessagesByConversationQuery(conversationId));
         return ResponseEntity.ok(results.stream().map(messageAssembler::toResource).toList());
     }
 
     @PostMapping("/conversations/{conversationId}/close")
+    @Operation(summary = "Close conversation", description = "Closes an open conversation when the owner or renter ends it.")
     public ResponseEntity<ConversationResource> closeConversation(@PathVariable Long conversationId, @RequestParam Long userId) {
         var saved = conversationCommandService.handle(new CloseConversationCommand(conversationId, userId));
         return ResponseEntity.ok(conversationAssembler.toResource(saved));

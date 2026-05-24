@@ -7,6 +7,8 @@ import app.web.rtgtechnologies.rent2go.booking_reservations.interfaces.rest.asse
 import app.web.rtgtechnologies.rent2go.booking_reservations.interfaces.rest.resources.AddFavoriteResource;
 import app.web.rtgtechnologies.rent2go.booking_reservations.interfaces.rest.resources.FavoriteResource;
 import app.web.rtgtechnologies.rent2go.shared.interfaces.rest.resource.PagedResponse;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.AllArgsConstructor;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
@@ -21,6 +23,7 @@ import java.net.URI;
 import java.util.List;
 import java.util.function.Function;
 
+@Tag(name = "Booking & Reservations", description = "Favorite vehicles management for renters")
 @RestController
 @RequestMapping("/api/v1/favorites")
 @AllArgsConstructor
@@ -34,6 +37,7 @@ public class FavoritesController {
 
     @PostMapping
     @PreAuthorize("hasRole('USER')")
+    @Operation(summary = "Add favorite", description = "Adds a vehicle to the authenticated user's favorite list.")
     public ResponseEntity<FavoriteResource> addFavorite(@RequestBody @Valid AddFavoriteResource resource) {
         var command = assembler.toCommand(resource);
         var saved = commandService.handle(command);
@@ -43,6 +47,7 @@ public class FavoritesController {
 
     @DeleteMapping
     @PreAuthorize("hasRole('USER')")
+    @Operation(summary = "Remove favorite", description = "Removes a vehicle from a user's favorites using user and vehicle identifiers.")
     public ResponseEntity<Void> removeFavorite(
         @RequestParam @Positive(message = "User ID must be positive") Long userId,
         @RequestParam @Positive(message = "Vehicle ID must be positive") Long vehicleId
@@ -53,6 +58,7 @@ public class FavoritesController {
 
     @GetMapping
     @PreAuthorize("hasRole('USER')")
+    @Operation(summary = "List favorites", description = "Returns the paginated favorite vehicles for a user. Page starts at 1.")
     public ResponseEntity<PagedResponse<FavoriteResource>> listFavorites(
         @RequestParam @Positive(message = "User ID must be positive") Long userId,
         @RequestParam(defaultValue = "1") @Min(value = 1, message = "Page must be greater than or equal to 1") int page,

@@ -14,6 +14,8 @@ import org.springframework.validation.annotation.Validated;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeParseException;
 import java.util.Optional;
+import java.util.List;
+import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/v1/payments/promocodes")
@@ -55,5 +57,25 @@ public class PromoCodeController {
         PromoCodeResource r = new PromoCodeResource();
         r.setCode(d.getCode()); r.setPercentage(d.getPercentage()); r.setActive(true);
         return ResponseEntity.ok(r);
+    }
+
+    @GetMapping
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<List<PromoCodeResource>> listAll() {
+        List<app.web.rtgtechnologies.rent2go.payments.domain.model.entities.PromoCode> all = promoService.listAll();
+        var res = all.stream().map(p -> {
+            PromoCodeResource r = new PromoCodeResource();
+            r.setCode(p.getCode()); r.setPercentage(p.getPercentage()); r.setActive(p.isActive());
+            r.setExpiresAt(p.getExpiresAt() == null ? null : p.getExpiresAt().toString());
+            return r;
+        }).collect(Collectors.toList());
+        return ResponseEntity.ok(res);
+    }
+
+    @DeleteMapping("/{code}")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<Void> delete(@PathVariable @NotBlank(message = "Code is required") String code) {
+        boolean ok = promoService.deleteByCode(code);
+        return ok ? ResponseEntity.noContent().build() : ResponseEntity.notFound().build();
     }
 }

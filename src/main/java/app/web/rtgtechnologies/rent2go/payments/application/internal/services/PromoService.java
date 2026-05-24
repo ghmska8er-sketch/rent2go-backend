@@ -7,6 +7,7 @@ import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
 import java.util.Optional;
+import java.util.List;
 import java.math.BigDecimal;
 
 import org.springframework.transaction.annotation.Transactional;
@@ -28,6 +29,10 @@ public class PromoService {
         });
     }
 
+    public List<PromoCode> listAll() {
+        return repo.findAll();
+    }
+
     @Transactional
     public PromoCode createPromo(String code, BigDecimal percentage, LocalDateTime expiresAt) {
         if (code == null || code.isBlank()) throw new IllegalArgumentException("code required");
@@ -43,6 +48,14 @@ public class PromoService {
         var p = opt.get();
         p.setActive(false);
         repo.save(p);
+        return true;
+    }
+
+    @Transactional
+    public boolean deleteByCode(String code) {
+        var opt = repo.findByCode(code);
+        if (opt.isEmpty()) return false;
+        repo.delete(opt.get());
         return true;
     }
 }

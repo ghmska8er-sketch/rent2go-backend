@@ -58,7 +58,7 @@ public class ReservationCommandServiceImpl implements ReservationCommandService 
         reservation.cancel();
         var saved = reservationRepository.save(reservation);
         try {
-            notificationService.notifyReservationCancelled(saved.getId(), "Cancelled by renter");
+            notificationService.notifyReservationCancelled(saved.getId(), saved.getRenterId(), saved.getOwnerId(), "Cancelled by renter");
         } catch (Exception ex) {
         }
         return saved;
@@ -127,7 +127,7 @@ public class ReservationCommandServiceImpl implements ReservationCommandService 
 
         var saved = reservationRepository.save(reservation);
         try {
-            notificationService.notifyReservationStatusChanged(saved.getId(), previous, saved.getStatus().getStatus());
+            notificationService.notifyReservationStatusChanged(saved.getId(), saved.getRenterId(), saved.getOwnerId(), previous, saved.getStatus().getStatus());
         } catch (Exception ex) {
         }
 
@@ -155,7 +155,7 @@ public class ReservationCommandServiceImpl implements ReservationCommandService 
         reservation.complete();
         var saved = reservationRepository.save(reservation);
         try {
-            notificationService.notifyReservationStatusChanged(saved.getId(), "ACTIVE", "COMPLETED");
+            notificationService.notifyReservationStatusChanged(saved.getId(), saved.getRenterId(), saved.getOwnerId(), "ACTIVE", "COMPLETED");
         } catch (Exception ex) {
         }
 

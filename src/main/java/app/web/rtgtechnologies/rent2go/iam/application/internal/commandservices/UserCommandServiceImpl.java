@@ -51,8 +51,11 @@ public class UserCommandServiceImpl implements UserCommandService {
         if (command.accountType() == null) {
             throw new IllegalArgumentException("Account type is required");
         }
-        if (command.accountType() != AccountType.OWNER && command.accountType() != AccountType.RENTER) {
-            throw new IllegalArgumentException("Account type must be OWNER or RENTER");
+        if (command.accountType() != AccountType.OWNER
+                && command.accountType() != AccountType.RENTER
+                && command.accountType() != AccountType.BOTH
+                && command.accountType() != AccountType.ADMIN) {
+            throw new IllegalArgumentException("Account type must be OWNER, RENTER, BOTH or ADMIN");
         }
 
         // Validar que el correo no exista

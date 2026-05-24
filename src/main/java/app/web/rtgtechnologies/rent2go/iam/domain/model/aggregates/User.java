@@ -111,7 +111,7 @@ public class User extends AuditableAbstractAggregateRoot<User> {
     }
 
     public void deactivate() {
-        this.status = UserStatus.INACTIVE;
+        this.status = UserStatus.SUSPENDED;
     }
 
     public void block() {

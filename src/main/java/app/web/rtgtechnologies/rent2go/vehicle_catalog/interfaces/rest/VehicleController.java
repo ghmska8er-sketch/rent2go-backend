@@ -21,6 +21,7 @@ import app.web.rtgtechnologies.rent2go.vehicle_catalog.interfaces.rest.transform
 import app.web.rtgtechnologies.rent2go.vehicle_catalog.interfaces.rest.transform.UploadVehicleImageCommandFromResourceAssembler;
 import app.web.rtgtechnologies.rent2go.vehicle_catalog.interfaces.rest.transform.VehicleImageResourceFromEntityAssembler;
 import app.web.rtgtechnologies.rent2go.vehicle_catalog.interfaces.rest.transform.VehicleResourceFromEntityAssembler;
+import app.web.rtgtechnologies.rent2go.shared.infrastructure.cloudinary.CloudinaryStorageService;
 import app.web.rtgtechnologies.rent2go.iam.infrastructure.services.JwtTokenProvider;
 import app.web.rtgtechnologies.rent2go.shared.interfaces.rest.resource.PagedResponse;
 import io.swagger.v3.oas.annotations.Operation;
@@ -61,6 +62,7 @@ public class VehicleController {
     private final VehicleCommandService vehicleCommandService;
     private final VehicleQueryService vehicleQueryService;
     private final JwtTokenProvider jwtTokenProvider;
+    private final CloudinaryStorageService cloudinaryStorageService;
 
     /**
      * POST /api/v1/vehicles
@@ -215,6 +217,71 @@ public class VehicleController {
     ) {
         var command = UploadVehicleImageCommandFromResourceAssembler.toCommand(id, request);
         Vehicle vehicle = vehicleCommandService.handle(command);
+        VehicleResource response = VehicleResourceFromEntityAssembler.toResource(vehicle);
+        return ResponseEntity.status(HttpStatus.CREATED).body(response);
+    }
+
+    /**
+     * POST /api/v1/vehicles/{id}/images/upload
+     *
+     * Upload a single image file for a vehicle. The file is uploaded to Cloudinary
+     * and the returned URL is persisted via the existing domain command flow.
+     */
+    @PostMapping(path = "/{id}/images/upload", consumes = {"multipart/form-data"})
+    @PreAuthorize("hasRole('USER')")
+    @Operation(summary = "Upload a vehicle image (multipart file)")
+    public ResponseEntity<VehicleResource> uploadVehicleImageFile(
+        @PathVariable Long id,
+        @RequestPart("file") org.springframework.web.multipart.MultipartFile file,
+        @RequestPart(value = "isPrimary", required = false) Boolean isPrimary,
+        @RequestPart(value = "imageOrder", required = false) Integer imageOrder
+    ) throws java.io.IOException {
+
+        String imageUrl = cloudinaryStorageService.upload(file);
+
+        // Build resource and delegate to existing command flow
+        UploadVehicleImageResource resource = new UploadVehicleImageResource(null, imageUrl, isPrimary, imageOrder);
+        var command = UploadVehicleImageCommandFromResourceAssembler.toCommand(id, resource);
+        Vehicle vehicle = vehicleCommandService.handle(command);
+        VehicleResource response = VehicleResourceFromEntityAssembler.toResource(vehicle);
+        return ResponseEntity.status(HttpStatus.CREATED).body(response);
+    }
+
+    /**
+     * POST /api/v1/vehicles/{id}/images/upload/batch
+     *
+     * Upload multiple image files for a vehicle in a single multipart request.
+     * The request should include multiple `files` parts and optional parallel arrays
+     * `isPrimary` and `imageOrder` to provide metadata per file (order must match files order).
+     */
+    @PostMapping(path = "/{id}/images/upload/batch", consumes = {"multipart/form-data"})
+    @PreAuthorize("hasRole('USER')")
+    @Operation(summary = "Upload multiple vehicle images (multipart batch)")
+    public ResponseEntity<VehicleResource> uploadVehicleImagesBatchMultipart(
+        @PathVariable Long id,
+        @RequestPart("files") java.util.List<org.springframework.web.multipart.MultipartFile> files,
+        @RequestPart(value = "isPrimary", required = false) java.util.List<Boolean> isPrimaryList,
+        @RequestPart(value = "imageOrder", required = false) java.util.List<Integer> imageOrderList
+    ) throws java.io.IOException {
+
+        Vehicle vehicle = null;
+
+        for (int i = 0; i < files.size(); i++) {
+            org.springframework.web.multipart.MultipartFile f = files.get(i);
+            String imageUrl = cloudinaryStorageService.upload(f);
+
+            Boolean isPrimary = (isPrimaryList != null && isPrimaryList.size() > i) ? isPrimaryList.get(i) : null;
+            Integer order = (imageOrderList != null && imageOrderList.size() > i) ? imageOrderList.get(i) : null;
+
+            UploadVehicleImageResource resource = new UploadVehicleImageResource(null, imageUrl, isPrimary, order);
+            var command = UploadVehicleImageCommandFromResourceAssembler.toCommand(id, resource);
+            vehicle = vehicleCommandService.handle(command);
+        }
+
+        if (vehicle == null) {
+            vehicle = vehicleQueryService.handle(new GetVehicleDetailsQuery(id));
+        }
+
         VehicleResource response = VehicleResourceFromEntityAssembler.toResource(vehicle);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }

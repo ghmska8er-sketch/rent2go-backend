@@ -55,7 +55,7 @@ public class FavoritesController {
     @PreAuthorize("hasRole('USER')")
     public ResponseEntity<PagedResponse<FavoriteResource>> listFavorites(
         @RequestParam @Positive(message = "User ID must be positive") Long userId,
-        @RequestParam(defaultValue = "0") @Min(value = 0, message = "Page must be greater than or equal to 0") int page,
+        @RequestParam(defaultValue = "1") @Min(value = 1, message = "Page must be greater than or equal to 1") int page,
         @RequestParam(defaultValue = "20") @Min(value = 1, message = "Size must be greater than 0") @Max(value = 100, message = "Size must be at most 100") int size
     ) {
         var results = queryService.findByUserId(userId);
@@ -63,10 +63,10 @@ public class FavoritesController {
     }
 
     private <T, R> PagedResponse<R> toPagedResponse(List<T> source, int page, int size, Function<T, R> mapper) {
-        int safePage = Math.max(0, page);
+        int safePage = Math.max(1, page);
         int safeSize = Math.max(1, size);
         long totalElements = source.size();
-        int fromIndex = Math.min(safePage * safeSize, source.size());
+        int fromIndex = Math.min((safePage - 1) * safeSize, source.size());
         int toIndex = Math.min(fromIndex + safeSize, source.size());
         List<R> content = source.subList(fromIndex, toIndex).stream().map(mapper).toList();
         int totalPages = totalElements == 0 ? 0 : (int) Math.ceil((double) totalElements / safeSize);

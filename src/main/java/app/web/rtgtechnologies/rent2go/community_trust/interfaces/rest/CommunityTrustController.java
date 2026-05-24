@@ -1,25 +1,41 @@
 package app.web.rtgtechnologies.rent2go.community_trust.interfaces.rest;
 
 import app.web.rtgtechnologies.rent2go.community_trust.application.internal.commandservices.ReviewCommandServiceImpl;
+import app.web.rtgtechnologies.rent2go.community_trust.application.internal.commandservices.ConversationCommandServiceImpl;
+import app.web.rtgtechnologies.rent2go.community_trust.application.internal.queryservices.ConversationQueryServiceImpl;
 import app.web.rtgtechnologies.rent2go.community_trust.application.internal.queryservices.ReviewQueryServiceImpl;
+import app.web.rtgtechnologies.rent2go.community_trust.domain.model.commands.CloseConversationCommand;
 import app.web.rtgtechnologies.rent2go.community_trust.domain.model.commands.ApproveReviewCommand;
 import app.web.rtgtechnologies.rent2go.community_trust.domain.model.commands.BlockUserForTrustCommand;
 import app.web.rtgtechnologies.rent2go.community_trust.domain.model.commands.FlagReviewCommand;
 import app.web.rtgtechnologies.rent2go.community_trust.domain.model.commands.RejectReviewCommand;
+import app.web.rtgtechnologies.rent2go.community_trust.domain.model.commands.SendMessageCommand;
+import app.web.rtgtechnologies.rent2go.community_trust.domain.model.commands.StartConversationCommand;
 import app.web.rtgtechnologies.rent2go.community_trust.domain.model.commands.SubmitReviewCommand;
+import app.web.rtgtechnologies.rent2go.community_trust.domain.model.queries.GetConversationByIdQuery;
+import app.web.rtgtechnologies.rent2go.community_trust.domain.model.queries.GetConversationsByUserQuery;
 import app.web.rtgtechnologies.rent2go.community_trust.domain.model.queries.GetAverageRatingQuery;
+import app.web.rtgtechnologies.rent2go.community_trust.domain.model.queries.GetMessagesByConversationQuery;
 import app.web.rtgtechnologies.rent2go.community_trust.domain.model.queries.GetReviewsByUserQuery;
 import app.web.rtgtechnologies.rent2go.community_trust.domain.model.queries.GetReviewsByVehicleQuery;
 import app.web.rtgtechnologies.rent2go.community_trust.domain.model.queries.GetUserReputationQuery;
+import app.web.rtgtechnologies.rent2go.community_trust.interfaces.rest.assemblers.ConversationResourceFromEntityAssembler;
 import app.web.rtgtechnologies.rent2go.community_trust.interfaces.rest.assemblers.BlockUserForTrustCommandFromResourceAssembler;
+import app.web.rtgtechnologies.rent2go.community_trust.interfaces.rest.assemblers.MessageResourceFromEntityAssembler;
 import app.web.rtgtechnologies.rent2go.community_trust.interfaces.rest.assemblers.FlagReviewCommandFromResourceAssembler;
 import app.web.rtgtechnologies.rent2go.community_trust.interfaces.rest.assemblers.ModerationActionCommandFromResourceAssembler;
+import app.web.rtgtechnologies.rent2go.community_trust.interfaces.rest.assemblers.SendMessageCommandFromResourceAssembler;
+import app.web.rtgtechnologies.rent2go.community_trust.interfaces.rest.assemblers.StartConversationCommandFromResourceAssembler;
 import app.web.rtgtechnologies.rent2go.community_trust.interfaces.rest.assemblers.ReviewResourceFromEntityAssembler;
 import app.web.rtgtechnologies.rent2go.community_trust.interfaces.rest.assemblers.SubmitReviewCommandFromResourceAssembler;
+import app.web.rtgtechnologies.rent2go.community_trust.interfaces.rest.resources.ConversationResource;
 import app.web.rtgtechnologies.rent2go.community_trust.interfaces.rest.resources.BlockUserResource;
+import app.web.rtgtechnologies.rent2go.community_trust.interfaces.rest.resources.MessageResource;
 import app.web.rtgtechnologies.rent2go.community_trust.interfaces.rest.resources.FlagReviewResource;
 import app.web.rtgtechnologies.rent2go.community_trust.interfaces.rest.resources.ModerationActionResource;
 import app.web.rtgtechnologies.rent2go.community_trust.interfaces.rest.resources.ReviewResource;
+import app.web.rtgtechnologies.rent2go.community_trust.interfaces.rest.resources.SendMessageResource;
+import app.web.rtgtechnologies.rent2go.community_trust.interfaces.rest.resources.StartConversationResource;
 import app.web.rtgtechnologies.rent2go.community_trust.interfaces.rest.resources.SubmitReviewResource;
 import app.web.rtgtechnologies.rent2go.community_trust.interfaces.rest.resources.UserReputationResource;
 import app.web.rtgtechnologies.rent2go.community_trust.interfaces.rest.resources.VehicleRatingResource;
@@ -38,11 +54,17 @@ public class CommunityTrustController {
 
     private final ReviewCommandServiceImpl commandService;
     private final ReviewQueryServiceImpl queryService;
+    private final ConversationCommandServiceImpl conversationCommandService;
+    private final ConversationQueryServiceImpl conversationQueryService;
     private final SubmitReviewCommandFromResourceAssembler submitAssembler;
     private final FlagReviewCommandFromResourceAssembler flagAssembler;
     private final ModerationActionCommandFromResourceAssembler moderationAssembler;
     private final BlockUserForTrustCommandFromResourceAssembler blockAssembler;
+    private final StartConversationCommandFromResourceAssembler startConversationAssembler;
+    private final SendMessageCommandFromResourceAssembler sendMessageAssembler;
     private final ReviewResourceFromEntityAssembler reviewAssembler;
+    private final ConversationResourceFromEntityAssembler conversationAssembler;
+    private final MessageResourceFromEntityAssembler messageAssembler;
 
     @PostMapping("/reviews")
     public ResponseEntity<ReviewResource> submitReview(@Valid @RequestBody SubmitReviewResource resource) {
@@ -116,5 +138,46 @@ public class CommunityTrustController {
         BlockUserForTrustCommand command = blockAssembler.toCommand(userId, resource);
         commandService.handle(command);
         return ResponseEntity.noContent().build();
+    }
+
+    @PostMapping("/conversations")
+    public ResponseEntity<ConversationResource> startConversation(@Valid @RequestBody StartConversationResource resource) {
+        StartConversationCommand command = startConversationAssembler.toCommand(resource);
+        var saved = conversationCommandService.handle(command);
+        return ResponseEntity.created(URI.create("/api/v1/community-trust/conversations/" + saved.getId()))
+            .body(conversationAssembler.toResource(saved));
+    }
+
+    @GetMapping("/conversations/{conversationId}")
+    public ResponseEntity<ConversationResource> getConversation(@PathVariable Long conversationId) {
+        return conversationQueryService.handle(new GetConversationByIdQuery(conversationId))
+            .map(conversation -> ResponseEntity.ok(conversationAssembler.toResource(conversation)))
+            .orElseGet(() -> ResponseEntity.notFound().build());
+    }
+
+    @GetMapping("/users/{userId}/conversations")
+    public ResponseEntity<List<ConversationResource>> getConversationsByUser(@PathVariable Long userId) {
+        var results = conversationQueryService.handle(new GetConversationsByUserQuery(userId));
+        return ResponseEntity.ok(results.stream().map(conversationAssembler::toResource).toList());
+    }
+
+    @PostMapping("/conversations/{conversationId}/messages")
+    public ResponseEntity<MessageResource> sendMessage(@PathVariable Long conversationId, @Valid @RequestBody SendMessageResource resource) {
+        SendMessageCommand command = sendMessageAssembler.toCommand(conversationId, resource);
+        var saved = conversationCommandService.handle(command);
+        return ResponseEntity.created(URI.create("/api/v1/community-trust/conversations/" + conversationId + "/messages/" + saved.getId()))
+            .body(messageAssembler.toResource(saved));
+    }
+
+    @GetMapping("/conversations/{conversationId}/messages")
+    public ResponseEntity<List<MessageResource>> getMessagesByConversation(@PathVariable Long conversationId) {
+        var results = conversationQueryService.handle(new GetMessagesByConversationQuery(conversationId));
+        return ResponseEntity.ok(results.stream().map(messageAssembler::toResource).toList());
+    }
+
+    @PostMapping("/conversations/{conversationId}/close")
+    public ResponseEntity<ConversationResource> closeConversation(@PathVariable Long conversationId, @RequestParam Long userId) {
+        var saved = conversationCommandService.handle(new CloseConversationCommand(conversationId, userId));
+        return ResponseEntity.ok(conversationAssembler.toResource(saved));
     }
 }

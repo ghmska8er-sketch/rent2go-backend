@@ -48,6 +48,9 @@ public class Vehicle extends AuditableAbstractAggregateRoot<Vehicle> {
     @Column(unique = true, nullable = false, length = 50)
     private String vin;
 
+    @Column(name = "owner_id")
+    private Long ownerId;
+
     @Column(nullable = false, length = 15)
     @Enumerated(EnumType.STRING)
     private VehicleStatus status;
@@ -84,6 +87,15 @@ public class Vehicle extends AuditableAbstractAggregateRoot<Vehicle> {
     @OneToMany(cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY, mappedBy = "vehicle")
     private List<VehicleImage> images = new ArrayList<>();
 
+    @Builder.Default
+    @ManyToMany(fetch = FetchType.LAZY)
+    @JoinTable(
+        name = "vehicle_feature_mappings",
+        joinColumns = @JoinColumn(name = "vehicle_id"),
+        inverseJoinColumns = @JoinColumn(name = "feature_id")
+    )
+    private List<VehicleFeature> features = new ArrayList<>();
+
     // ========== Business Logic ==========
 
     public boolean isAvailable() {
@@ -91,9 +103,7 @@ public class Vehicle extends AuditableAbstractAggregateRoot<Vehicle> {
     }
 
     public void makeAvailable() {
-        if (this.status != VehicleStatus.RENTED && this.status != VehicleStatus.MAINTENANCE) {
-            this.status = VehicleStatus.AVAILABLE;
-        }
+        this.status = VehicleStatus.AVAILABLE;
     }
 
     public void markAsRented() {
@@ -249,5 +259,32 @@ public class Vehicle extends AuditableAbstractAggregateRoot<Vehicle> {
      */
     public boolean hasImages() {
         return !this.images.isEmpty();
+    }
+
+    public List<VehicleFeature> getFeatures() {
+        return new ArrayList<>(this.features);
+    }
+
+    public void addFeature(VehicleFeature feature) {
+        if (feature == null) {
+            throw new IllegalArgumentException("Feature cannot be null");
+        }
+
+        boolean alreadyLinked = this.features.stream()
+            .anyMatch(existingFeature -> existingFeature.getId() != null
+                && feature.getId() != null
+                && existingFeature.getId().equals(feature.getId()));
+
+        if (!alreadyLinked) {
+            this.features.add(feature);
+        }
+    }
+
+    public boolean removeFeature(Long featureId) {
+        if (featureId == null) {
+            return false;
+        }
+
+        return this.features.removeIf(feature -> feature.getId() != null && feature.getId().equals(featureId));
     }
 }

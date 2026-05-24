@@ -5,6 +5,7 @@ import app.web.rtgtechnologies.rent2go.vehicle_catalog.domain.model.aggregates.V
 import app.web.rtgtechnologies.rent2go.vehicle_catalog.domain.model.queries.GetAvailableVehiclesQuery;
 import app.web.rtgtechnologies.rent2go.vehicle_catalog.domain.model.queries.GetVehicleDetailsQuery;
 import app.web.rtgtechnologies.rent2go.vehicle_catalog.domain.model.queries.GetVehicleImagesQuery;
+import app.web.rtgtechnologies.rent2go.vehicle_catalog.domain.model.queries.GetVehiclesByOwnerQuery;
 import app.web.rtgtechnologies.rent2go.vehicle_catalog.domain.model.queries.SearchVehiclesByCriteriaQuery;
 
 import java.util.List;
@@ -42,6 +43,14 @@ public interface VehicleQueryService {
      * @return List of available vehicles
      */
     List<Vehicle> handle(GetAvailableVehiclesQuery query);
+
+    /**
+     * Get all vehicles published by a specific owner.
+     *
+     * @param query GetVehiclesByOwnerQuery with owner ID
+     * @return List of vehicles owned by that user
+     */
+    List<Vehicle> handle(GetVehiclesByOwnerQuery query);
 
     /**
      * Search available vehicles by search criteria (HU02, HU03)

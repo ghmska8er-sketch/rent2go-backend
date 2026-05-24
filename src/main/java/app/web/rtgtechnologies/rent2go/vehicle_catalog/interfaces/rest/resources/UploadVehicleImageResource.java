@@ -21,4 +21,5 @@ public class UploadVehicleImageResource {
     private String imageUrl;
 
     private Boolean isPrimary;
+    private Integer imageOrder;
 }

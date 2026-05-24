@@ -7,9 +7,18 @@ public record UserResource(
         Long id,
         String email,
         String username,
+        @JsonProperty("full_name")
+        String fullName,
+        String phone,
+        @JsonProperty("profile_image_url")
+        String profileImageUrl,
+        @JsonProperty("account_type")
+        String accountType,
         String status,
         @JsonProperty("email_verified")
         Boolean emailVerified,
+        @JsonProperty("phone_verified")
+        Boolean phoneVerified,
         @JsonProperty("two_factor_enabled")
         Boolean twoFactorEnabled,
         @JsonProperty("created_at")

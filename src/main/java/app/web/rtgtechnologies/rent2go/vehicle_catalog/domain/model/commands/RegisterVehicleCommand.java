@@ -10,6 +10,7 @@ import java.math.BigDecimal;
  * CQRS Pattern: Modifying command that triggers a state change.
  */
 public record RegisterVehicleCommand(
+    Long ownerId,
     String licensePlate,
     String make,
     String model,

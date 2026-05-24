@@ -1,6 +1,8 @@
 package app.web.rtgtechnologies.rent2go.booking_reservations.domain.model.valueobjects;
 
 import app.web.rtgtechnologies.rent2go.shared.domain.ValueObject;
+import jakarta.persistence.Column;
+import jakarta.persistence.Embeddable;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -17,8 +19,10 @@ import java.util.UUID;
 @Getter
 @NoArgsConstructor
 @AllArgsConstructor
+@Embeddable
 public class ReservationCode extends ValueObject {
 
+    @Column(name = "reservation_code", nullable = false, unique = true, length = 20)
     private String code;
 
     public static ReservationCode generate() {

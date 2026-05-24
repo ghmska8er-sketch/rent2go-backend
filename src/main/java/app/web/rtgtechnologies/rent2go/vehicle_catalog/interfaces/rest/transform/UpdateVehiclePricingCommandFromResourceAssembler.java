@@ -16,12 +16,13 @@ public final class UpdateVehiclePricingCommandFromResourceAssembler {
     /**
      * Convert HTTP resource to domain command
      *
+     * @param vehicleId Vehicle identifier from the path
      * @param resource UpdateVehiclePricingResource from HTTP layer
      * @return UpdateVehiclePricingCommand for domain layer
      */
-    public static UpdateVehiclePricingCommand toCommand(UpdateVehiclePricingResource resource) {
+    public static UpdateVehiclePricingCommand toCommand(Long vehicleId, UpdateVehiclePricingResource resource) {
         return new UpdateVehiclePricingCommand(
-            resource.getVehicleId(),
+            vehicleId,
             resource.getNewDailyPrice()
         );
     }

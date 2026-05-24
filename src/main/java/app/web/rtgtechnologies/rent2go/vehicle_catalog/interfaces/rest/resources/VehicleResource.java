@@ -7,6 +7,7 @@ import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
 import java.util.Date;
+import java.util.List;
 
 /**
  * VehicleResource
@@ -23,6 +24,7 @@ import java.util.Date;
 public class VehicleResource {
 
     private Long id;
+    private Long ownerId;
     private String licensePlate;
     private String make;
     private String model;
@@ -36,6 +38,7 @@ public class VehicleResource {
     private Integer seats;
     private String transmission;
     private String fuelType;
+    private List<String> features;
     private String primaryImageUrl;
     private String primaryImagePath;
     private Date createdAt;

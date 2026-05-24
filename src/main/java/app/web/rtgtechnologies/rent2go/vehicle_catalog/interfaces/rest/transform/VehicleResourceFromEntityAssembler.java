@@ -3,6 +3,8 @@ package app.web.rtgtechnologies.rent2go.vehicle_catalog.interfaces.rest.transfor
 import app.web.rtgtechnologies.rent2go.vehicle_catalog.domain.model.aggregates.Vehicle;
 import app.web.rtgtechnologies.rent2go.vehicle_catalog.interfaces.rest.resources.VehicleResource;
 
+import java.util.List;
+
 /**
  * VehicleResourceFromEntityAssembler
  *
@@ -22,6 +24,7 @@ public final class VehicleResourceFromEntityAssembler {
     public static VehicleResource toResource(Vehicle entity) {
         return VehicleResource.builder()
             .id(entity.getId())
+            .ownerId(entity.getOwnerId())
             .licensePlate(entity.getLicensePlate())
             .make(entity.getMake())
             .model(entity.getModel())
@@ -35,6 +38,7 @@ public final class VehicleResourceFromEntityAssembler {
             .seats(entity.getSeats())
             .transmission(entity.getTransmission())
             .fuelType(entity.getFuelType())
+            .features(entity.getFeatures().stream().map(feature -> feature.getName()).toList())
             .primaryImageUrl(entity.getPrimaryImageUrl())
             .primaryImagePath(entity.getPrimaryImagePath())
             .createdAt(entity.getCreatedAt())

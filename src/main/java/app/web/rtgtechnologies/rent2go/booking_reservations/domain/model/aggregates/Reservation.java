@@ -74,6 +74,21 @@ public class Reservation extends AuditableAbstractAggregateRoot<Reservation> {
     @Column(name = "paid_at")
     private LocalDateTime paidAt;
 
+    @Column(name = "pickup_location")
+    private String pickupLocation;
+
+    @Column(name = "return_location")
+    private String returnLocation;
+
+    @Column(name = "coverage_plan")
+    private String coveragePlan;
+
+    @Column(name = "pickup_photos", columnDefinition = "TEXT")
+    private String pickupPhotos;
+
+    @Column(name = "return_photos", columnDefinition = "TEXT")
+    private String returnPhotos;
+
     @Builder
     private Reservation(
         ReservationCode reservationCode,
@@ -181,6 +196,18 @@ public class Reservation extends AuditableAbstractAggregateRoot<Reservation> {
     public void setDamageReport(String damageReport) {
         this.damageReport = damageReport;
     }
+
+    public void setPickupLocation(String pickupLocation) { this.pickupLocation = pickupLocation; }
+    public void setReturnLocation(String returnLocation) { this.returnLocation = returnLocation; }
+    public void setCoveragePlan(String coveragePlan) { this.coveragePlan = coveragePlan; }
+    public void setPickupPhotos(java.util.List<String> photos) { this.pickupPhotos = photos == null ? null : String.join("||", photos); }
+    public void setReturnPhotos(java.util.List<String> photos) { this.returnPhotos = photos == null ? null : String.join("||", photos); }
+
+    public String getPickupLocation() { return pickupLocation; }
+    public String getReturnLocation() { return returnLocation; }
+    public String getCoveragePlan() { return coveragePlan; }
+    public java.util.List<String> getPickupPhotos() { return pickupPhotos == null ? null : java.util.Arrays.asList(pickupPhotos.split("\\|\\|")); }
+    public java.util.List<String> getReturnPhotos() { return returnPhotos == null ? null : java.util.Arrays.asList(returnPhotos.split("\\|\\|")); }
 
     public void markPaid(String paymentIntentId) {
         if (paymentIntentId == null || paymentIntentId.isBlank()) {

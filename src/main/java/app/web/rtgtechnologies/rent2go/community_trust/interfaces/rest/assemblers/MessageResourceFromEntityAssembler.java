@@ -16,6 +16,7 @@ public class MessageResourceFromEntityAssembler {
             message.getReadAt() == null ? null : message.getReadAt().toString(),
             message.getCreatedAt() == null ? null : message.getCreatedAt().toString(),
             message.getUpdatedAt() == null ? null : message.getUpdatedAt().toString()
+            , null, null, null
         );
     }
 }

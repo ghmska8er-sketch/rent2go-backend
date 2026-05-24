@@ -19,6 +19,7 @@ public class CalculateFareRequest {
     @Valid
     private List<DiscountDto> discounts;
     private String promoCode;
+    private String coveragePlan;
 
     public BigDecimal getBaseAmount() {
         return baseAmount;
@@ -59,4 +60,7 @@ public class CalculateFareRequest {
     public void setPromoCode(String promoCode) {
         this.promoCode = promoCode;
     }
+
+    public String getCoveragePlan() { return coveragePlan; }
+    public void setCoveragePlan(String coveragePlan) { this.coveragePlan = coveragePlan; }
 }

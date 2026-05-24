@@ -15,6 +15,11 @@ public class CreateReservationCommandFromResourceAssembler {
             r.startDate(),
             r.endDate(),
             r.totalAmount()
+            , r.pickupLocation(),
+            r.returnLocation(),
+            r.coveragePlan(),
+            r.pickupPhotos(),
+            r.returnPhotos()
         );
     }
 }

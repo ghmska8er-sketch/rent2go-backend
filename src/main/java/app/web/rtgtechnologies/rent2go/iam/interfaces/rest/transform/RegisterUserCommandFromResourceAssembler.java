@@ -8,10 +8,16 @@ import app.web.rtgtechnologies.rent2go.iam.interfaces.rest.resources.RegisterUse
 @Component
 public class RegisterUserCommandFromResourceAssembler {
     public RegisterUserCommand toCommandFromResource(RegisterUserResource resource) {
+        String username = resource.username();
+        if (username == null || username.isBlank()) {
+            String base = resource.fullName() == null ? "user" : resource.fullName().toLowerCase().replaceAll("[^a-z0-9]", ".");
+            username = base + "_" + (System.currentTimeMillis() % 10000);
+        }
+
         return new RegisterUserCommand(
                 resource.email(),
                 resource.password(),
-                resource.username(),
+                username,
             resource.fullName(),
             resource.phone(),
             resource.profileImageUrl(),

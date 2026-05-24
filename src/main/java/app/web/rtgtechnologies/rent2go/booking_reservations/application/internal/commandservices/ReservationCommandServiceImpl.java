@@ -38,6 +38,17 @@ public class ReservationCommandServiceImpl implements ReservationCommandService 
             command.totalAmount()
         );
 
+        // Apply optional pickup/return metadata if provided
+        try {
+            reservation.setPickupLocation(command.pickupLocation());
+            reservation.setReturnLocation(command.returnLocation());
+            reservation.setCoveragePlan(command.coveragePlan());
+            reservation.setPickupPhotos(command.pickupPhotos());
+            reservation.setReturnPhotos(command.returnPhotos());
+        } catch (Exception ex) {
+            // ignore metadata errors to avoid blocking reservation creation
+        }
+
         var saved = reservationRepository.save(reservation);
         try {
             notificationService.notifyReservationCreated(saved.getId(), saved.getRenterId(), saved.getOwnerId());

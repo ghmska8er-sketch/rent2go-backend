@@ -8,6 +8,9 @@ public record UserReputationResource(
     BigDecimal averageRating,
     Integer trustScore,
     Boolean blocked,
-    String lastModerationReason
+    String lastModerationReason,
+    Integer completedTrips,
+    BigDecimal acceptanceRate,
+    BigDecimal responseRate
 ) {
 }

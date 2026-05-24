@@ -105,7 +105,7 @@ public class UserController {
     @Operation(summary = "Submit KYC", description = "Submits identity verification data for review.")
     public ResponseEntity<Void> submitKyc(@Valid @RequestBody SubmitKycResource resource) {
         Long id = userCommandService.handle(new app.web.rtgtechnologies.rent2go.iam.domain.model.commands.SubmitKycCommand(
-                resource.userId(), resource.fullName(), resource.idNumber(), resource.documentUrl()
+            resource.userId(), resource.fullName(), resource.idNumber(), resource.dniFrontUrl(), resource.dniBackUrl(), resource.driverLicenseUrl()
         ));
         return ResponseEntity.status(HttpStatus.CREATED).build();
     }

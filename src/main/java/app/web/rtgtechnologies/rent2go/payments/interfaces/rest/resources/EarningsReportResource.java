@@ -9,6 +9,8 @@ public class EarningsReportResource {
     private String from;
     private String to;
     private Long paymentsCount;
+    private String nextPayoutDate;
+    private Long availableNowCents;
 
     public Long getOwnerId() { return ownerId; }
     public void setOwnerId(Long ownerId) { this.ownerId = ownerId; }
@@ -26,4 +28,8 @@ public class EarningsReportResource {
     public void setTo(String to) { this.to = to; }
     public Long getPaymentsCount() { return paymentsCount; }
     public void setPaymentsCount(Long paymentsCount) { this.paymentsCount = paymentsCount; }
+    public String getNextPayoutDate() { return nextPayoutDate; }
+    public void setNextPayoutDate(String nextPayoutDate) { this.nextPayoutDate = nextPayoutDate; }
+    public Long getAvailableNowCents() { return availableNowCents; }
+    public void setAvailableNowCents(Long availableNowCents) { this.availableNowCents = availableNowCents; }
 }

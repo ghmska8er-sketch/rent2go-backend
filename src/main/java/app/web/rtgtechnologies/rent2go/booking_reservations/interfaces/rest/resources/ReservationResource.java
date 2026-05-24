@@ -16,5 +16,10 @@ public record ReservationResource(
     String status,
     LocalDateTime pickupConfirmedAt,
     LocalDateTime returnConfirmedAt,
+    String pickupLocation,
+    String returnLocation,
+    String coveragePlan,
+    java.util.List<String> pickupPhotos,
+    java.util.List<String> returnPhotos,
     String damageReport
 ) {}

@@ -203,6 +203,9 @@ public class PaymentsController {
             resource.setAvailablePayoutCents(totalCents != null ? totalCents : 0L);
             resource.setPendingPayoutCents(0L);
             resource.setPaymentsCount(paymentCount != null ? paymentCount : 0L);
+            // Provide UI-friendly fields
+            resource.setAvailableNowCents(resource.getAvailablePayoutCents());
+            resource.setNextPayoutDate(java.time.LocalDate.now().plusDays(7).toString());
             return ResponseEntity.ok(resource);
         } catch (DateTimeParseException ex) {
             return ResponseEntity.badRequest().build();

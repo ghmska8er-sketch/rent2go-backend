@@ -35,12 +35,24 @@ public class UserReputation extends AuditableAbstractAggregateRoot<UserReputatio
     @Column(name = "last_moderation_reason", length = 500)
     private String lastModerationReason;
 
+    @Column(name = "completed_trips", nullable = false)
+    private Integer completedTrips;
+
+    @Column(name = "acceptance_rate", precision = 5, scale = 2)
+    private java.math.BigDecimal acceptanceRate;
+
+    @Column(name = "response_rate", precision = 5, scale = 2)
+    private java.math.BigDecimal responseRate;
+
     private UserReputation(Long userId) {
         this.userId = userId;
         this.approvedReviewCount = 0;
         this.averageRating = BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
         this.trustScore = 0;
         this.blocked = false;
+        this.completedTrips = 0;
+        this.acceptanceRate = BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
+        this.responseRate = BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
     }
 
     public static UserReputation forUser(Long userId) {

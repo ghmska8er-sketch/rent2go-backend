@@ -133,7 +133,10 @@ public class CommunityTrustController {
                 rep.getAverageRating(),
                 rep.getTrustScore(),
                 rep.isBlocked(),
-                rep.getLastModerationReason()
+                rep.getLastModerationReason(),
+                rep.getCompletedTrips(),
+                rep.getAcceptanceRate(),
+                rep.getResponseRate()
             )))
             .orElseGet(() -> ResponseEntity.notFound().build());
     }

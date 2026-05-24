@@ -7,6 +7,9 @@ public record MessageResource(
     String content,
     String readAt,
     String createdAt,
-    String updatedAt
+    String updatedAt,
+    Boolean isOnline,
+    String lastSeenAt,
+    Integer unreadCount
 ) {
 }

@@ -20,6 +20,11 @@ public class ReservationResourceFromEntityAssembler {
             r.getStatus().getStatus(),
             r.getPickupConfirmedAt(),
             r.getReturnConfirmedAt(),
+            r.getPickupLocation(),
+            r.getReturnLocation(),
+            r.getCoveragePlan(),
+            r.getPickupPhotos(),
+            r.getReturnPhotos(),
             r.getDamageReport()
         );
     }

@@ -148,7 +148,7 @@ public class UserCommandServiceImpl implements UserCommandService {
 
         var now = Instant.now();
         var entity = new app.web.rtgtechnologies.rent2go.iam.infrastructure.persistence.jpa.entities.KycApplication(
-                command.userId(), command.fullName(), command.idNumber(), command.documentUrl(), "PENDING", now
+            command.userId(), command.fullName(), command.idNumber(), command.dniFrontUrl(), command.dniBackUrl(), command.driverLicenseUrl(), "PENDING", now
         );
 
         var saved = kycApplicationRepository.save(entity);

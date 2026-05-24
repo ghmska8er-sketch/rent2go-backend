@@ -6,6 +6,7 @@ import app.web.rtgtechnologies.rent2go.booking_reservations.interfaces.rest.asse
 import app.web.rtgtechnologies.rent2go.booking_reservations.interfaces.rest.resources.BlockRequestResource;
 import lombok.AllArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.net.URI;
@@ -21,6 +22,7 @@ public class AvailabilityController {
     private final BlockVehicleCommandFromResourceAssembler assembler;
 
     @PostMapping("/block")
+    @PreAuthorize("hasRole('USER')")
     public ResponseEntity<Void> blockVehicle(@RequestBody BlockRequestResource resource) {
         var cmd = assembler.toCommand(resource);
         var saved = commandService.handle(cmd);
@@ -28,6 +30,7 @@ public class AvailabilityController {
     }
 
     @DeleteMapping("/{id}")
+    @PreAuthorize("hasRole('USER')")
     public ResponseEntity<Void> unblockVehicle(@PathVariable Long id, @RequestParam Long requestedBy) {
         commandService.handle(new app.web.rtgtechnologies.rent2go.booking_reservations.domain.model.commands.UnblockVehicleCommand(id, requestedBy));
         return ResponseEntity.noContent().build();

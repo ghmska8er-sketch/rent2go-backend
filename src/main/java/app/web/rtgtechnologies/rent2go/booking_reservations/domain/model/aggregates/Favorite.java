@@ -22,22 +22,22 @@ public class Favorite extends AuditableAbstractAggregateRoot<Favorite> {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(name = "renter_id", nullable = false)
-    private Long renterId;
+    @Column(name = "user_id", nullable = false)
+    private Long userId;
 
     @Column(name = "vehicle_id", nullable = false)
     private Long vehicleId;
 
 
-    private Favorite(Long renterId, Long vehicleId) {
-        this.renterId = renterId;
+    private Favorite(Long userId, Long vehicleId) {
+        this.userId = userId;
         this.vehicleId = vehicleId;
     }
 
-    public static Favorite of(Long renterId, Long vehicleId) {
-        if (renterId == null || vehicleId == null) {
-            throw new IllegalArgumentException("renterId and vehicleId are required");
+    public static Favorite of(Long userId, Long vehicleId) {
+        if (userId == null || vehicleId == null) {
+            throw new IllegalArgumentException("userId and vehicleId are required");
         }
-        return new Favorite(renterId, vehicleId);
+        return new Favorite(userId, vehicleId);
     }
 }

@@ -8,6 +8,6 @@ import org.springframework.stereotype.Component;
 public class AddFavoriteCommandFromResourceAssembler {
 
     public AddFavoriteCommand toCommand(AddFavoriteResource r) {
-        return new AddFavoriteCommand(r.renterId(), r.vehicleId());
+        return new AddFavoriteCommand(r.userId(), r.vehicleId());
     }
 }

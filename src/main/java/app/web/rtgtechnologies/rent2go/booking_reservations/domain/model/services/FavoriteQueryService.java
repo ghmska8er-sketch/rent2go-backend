@@ -6,5 +6,5 @@ import java.util.List;
 
 public interface FavoriteQueryService {
 
-    List<Favorite> findByRenterId(Long renterId);
+    List<Favorite> findByUserId(Long userId);
 }

@@ -25,6 +25,7 @@ import app.web.rtgtechnologies.rent2go.iam.infrastructure.services.JwtTokenProvi
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import org.springframework.security.access.prepost.PreAuthorize;
 import lombok.AllArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -61,6 +62,7 @@ public class VehicleController {
      * Register a new vehicle in the catalog.
      */
     @PostMapping
+    @PreAuthorize("hasRole('USER')")
     @Operation(summary = "Publish a new vehicle with specifications")
     public ResponseEntity<VehicleResource> registerVehicle(
         @RequestHeader(value = "Authorization", required = false) String authHeader,
@@ -86,6 +88,7 @@ public class VehicleController {
      * Retrieve vehicles published by the authenticated owner.
      */
     @GetMapping("/me")
+    @PreAuthorize("hasRole('USER')")
     @Operation(summary = "Get my published vehicles")
     public ResponseEntity<List<VehicleResource>> getMyVehicles(
         @RequestHeader(value = "Authorization", required = false) String authHeader
@@ -160,6 +163,7 @@ public class VehicleController {
      * Update the daily rental price of a vehicle.
      */
     @PutMapping("/{id}/price")
+    @PreAuthorize("hasRole('USER')")
     @Operation(summary = "Update vehicle pricing")
     public ResponseEntity<VehicleResource> updateVehiclePrice(
         @PathVariable Long id,
@@ -183,6 +187,7 @@ public class VehicleController {
      * Update editable vehicle details.
      */
     @PutMapping("/{id}")
+    @PreAuthorize("hasRole('USER')")
     @Operation(summary = "Update vehicle details")
     public ResponseEntity<VehicleResource> updateVehicleDetails(
         @PathVariable Long id,
@@ -200,6 +205,7 @@ public class VehicleController {
      * Upload a single image for a vehicle.
      */
     @PostMapping("/{id}/images")
+    @PreAuthorize("hasRole('USER')")
     @Operation(summary = "Upload a vehicle image")
     public ResponseEntity<VehicleResource> uploadVehicleImage(
         @PathVariable Long id,
@@ -217,6 +223,7 @@ public class VehicleController {
      * Upload multiple images for a vehicle in one request.
      */
     @PostMapping("/{id}/images/batch")
+    @PreAuthorize("hasRole('USER')")
     @Transactional
     @Operation(summary = "Upload multiple vehicle images")
     public ResponseEntity<VehicleResource> uploadVehicleImagesBatch(
@@ -243,6 +250,7 @@ public class VehicleController {
      * Mark an image as the primary image for the vehicle.
      */
     @PutMapping("/{vehicleId}/images/{imageId}/primary")
+    @PreAuthorize("hasRole('USER')")
     @Operation(summary = "Set primary vehicle image")
     public ResponseEntity<VehicleResource> setPrimaryImage(
         @PathVariable Long vehicleId,

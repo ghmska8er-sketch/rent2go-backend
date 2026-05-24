@@ -58,6 +58,12 @@ public class Reservation extends AuditableAbstractAggregateRoot<Reservation> {
 
     @Column(name = "returned_at")
     private LocalDateTime returnedAt;
+    
+    @Column(name = "payment_intent_id")
+    private String paymentIntentId;
+
+    @Column(name = "paid_at")
+    private LocalDateTime paidAt;
 
     @Builder
     private Reservation(
@@ -151,6 +157,20 @@ public class Reservation extends AuditableAbstractAggregateRoot<Reservation> {
         }
 
         this.dateRange = newRange;
+    }
+
+    public void markPaid(String paymentIntentId) {
+        if (paymentIntentId == null || paymentIntentId.isBlank()) {
+            throw new IllegalArgumentException("paymentIntentId required");
+        }
+
+        // Confirm the reservation if it's pending
+        if (this.status.isPending()) {
+            this.confirm();
+        }
+
+        this.paymentIntentId = paymentIntentId;
+        this.paidAt = LocalDateTime.now();
     }
 
     private void ensurePending() {

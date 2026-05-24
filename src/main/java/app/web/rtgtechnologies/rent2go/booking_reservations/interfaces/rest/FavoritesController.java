@@ -8,6 +8,7 @@ import app.web.rtgtechnologies.rent2go.booking_reservations.interfaces.rest.reso
 import app.web.rtgtechnologies.rent2go.booking_reservations.interfaces.rest.resources.FavoriteResource;
 import lombok.AllArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.net.URI;
@@ -23,6 +24,7 @@ public class FavoritesController {
     private final FavoriteResourceFromEntityAssembler resourceAssembler;
 
     @PostMapping
+    @PreAuthorize("hasRole('USER')")
     public ResponseEntity<FavoriteResource> addFavorite(@RequestBody AddFavoriteResource resource) {
         var command = assembler.toCommand(resource);
         var saved = commandService.handle(command);
@@ -31,14 +33,16 @@ public class FavoritesController {
     }
 
     @DeleteMapping
-    public ResponseEntity<Void> removeFavorite(@RequestParam Long renterId, @RequestParam Long vehicleId) {
-        commandService.handle(new app.web.rtgtechnologies.rent2go.booking_reservations.domain.model.commands.RemoveFavoriteCommand(renterId, vehicleId));
+    @PreAuthorize("hasRole('USER')")
+    public ResponseEntity<Void> removeFavorite(@RequestParam Long userId, @RequestParam Long vehicleId) {
+        commandService.handle(new app.web.rtgtechnologies.rent2go.booking_reservations.domain.model.commands.RemoveFavoriteCommand(userId, vehicleId));
         return ResponseEntity.noContent().build();
     }
 
     @GetMapping
-    public ResponseEntity<java.util.List<FavoriteResource>> listFavorites(@RequestParam Long renterId) {
-        var results = queryService.findByRenterId(renterId);
+    @PreAuthorize("hasRole('USER')")
+    public ResponseEntity<java.util.List<FavoriteResource>> listFavorites(@RequestParam Long userId) {
+        var results = queryService.findByUserId(userId);
         var payload = results.stream().map(resourceAssembler::toResource).toList();
         return ResponseEntity.ok(payload);
     }

@@ -1,6 +1,7 @@
 package app.web.rtgtechnologies.rent2go.iam.domain.model.aggregates;
 
 import app.web.rtgtechnologies.rent2go.iam.domain.model.valueobjects.Email;
+import app.web.rtgtechnologies.rent2go.iam.domain.model.valueobjects.AccountType;
 import app.web.rtgtechnologies.rent2go.iam.domain.model.valueobjects.Password;
 import app.web.rtgtechnologies.rent2go.iam.domain.model.valueobjects.UserStatus;
 import app.web.rtgtechnologies.rent2go.iam.domain.model.valueobjects.Username;
@@ -23,6 +24,10 @@ public class User extends AuditableAbstractAggregateRoot<User> {
     private Username username;
 
     @Enumerated(EnumType.STRING)
+    @Column(name = "account_type", nullable = false, length = 20)
+    private AccountType accountType;
+
+    @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false, length = 30)
     private UserStatus status;
 
@@ -35,10 +40,11 @@ public class User extends AuditableAbstractAggregateRoot<User> {
     public User() {
     }
 
-    public User(Email email, Password password, Username username) {
+    public User(Email email, Password password, Username username, AccountType accountType) {
         this.email = email;
         this.passwordHash = password.getHashedValue();
         this.username = username;
+        this.accountType = accountType;
         this.status = UserStatus.PENDING_VERIFICATION;
         this.emailVerified = false;
         this.twoFactorEnabled = false;
@@ -66,6 +72,14 @@ public class User extends AuditableAbstractAggregateRoot<User> {
 
     public void setUsername(Username username) {
         this.username = username;
+    }
+
+    public AccountType getAccountType() {
+        return accountType;
+    }
+
+    public void setAccountType(AccountType accountType) {
+        this.accountType = accountType;
     }
 
     public UserStatus getStatus() {

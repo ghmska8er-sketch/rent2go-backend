@@ -11,7 +11,7 @@ import app.web.rtgtechnologies.rent2go.payments.interfaces.rest.resources.Discou
 import app.web.rtgtechnologies.rent2go.payments.interfaces.rest.resources.EarningsReportResource;
 import app.web.rtgtechnologies.rent2go.payments.interfaces.rest.resources.FeeDto;
 import app.web.rtgtechnologies.rent2go.payments.interfaces.rest.resources.MoneyResource;
-import lombok.AllArgsConstructor;
+import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
@@ -33,7 +33,7 @@ import jakarta.validation.Valid;
 
 @RestController
 @RequestMapping("/api/v1/payments")
-@AllArgsConstructor
+@RequiredArgsConstructor
 public class PaymentsController {
 
     private final FareCalculationServiceImpl fareCalculationService;

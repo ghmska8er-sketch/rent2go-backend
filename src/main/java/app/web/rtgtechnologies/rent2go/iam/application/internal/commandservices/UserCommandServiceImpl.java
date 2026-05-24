@@ -14,7 +14,13 @@ import app.web.rtgtechnologies.rent2go.iam.domain.model.valueobjects.Password;
 import app.web.rtgtechnologies.rent2go.iam.domain.model.valueobjects.UserStatus;
 import app.web.rtgtechnologies.rent2go.iam.domain.model.valueobjects.Username;
 import app.web.rtgtechnologies.rent2go.iam.infrastructure.persistence.jpa.repositories.UserRepository;
+import app.web.rtgtechnologies.rent2go.iam.infrastructure.persistence.jpa.repositories.PasswordResetTokenRepository;
+import app.web.rtgtechnologies.rent2go.iam.infrastructure.persistence.jpa.entities.PasswordResetToken;
 import app.web.rtgtechnologies.rent2go.iam.infrastructure.services.JwtTokenProvider;
+import app.web.rtgtechnologies.rent2go.iam.infrastructure.services.EmailService;
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
+import java.util.UUID;
 
 @Service
 @Transactional
@@ -22,10 +28,16 @@ public class UserCommandServiceImpl implements UserCommandService {
 
     private final UserRepository userRepository;
     private final JwtTokenProvider jwtTokenProvider;
+    private final PasswordResetTokenRepository passwordResetTokenRepository;
+    private final EmailService emailService;
 
-    public UserCommandServiceImpl(UserRepository userRepository, JwtTokenProvider jwtTokenProvider) {
+    public UserCommandServiceImpl(UserRepository userRepository, JwtTokenProvider jwtTokenProvider,
+                                  PasswordResetTokenRepository passwordResetTokenRepository,
+                                  EmailService emailService) {
         this.userRepository = userRepository;
         this.jwtTokenProvider = jwtTokenProvider;
+        this.passwordResetTokenRepository = passwordResetTokenRepository;
+        this.emailService = emailService;
     }
 
     @Override
@@ -97,5 +109,54 @@ public class UserCommandServiceImpl implements UserCommandService {
         user.activate();
 
         userRepository.save(user);
+    }
+
+    @Override
+    public String handle(app.web.rtgtechnologies.rent2go.iam.domain.model.commands.RequestPasswordResetCommand command) {
+        var userOpt = userRepository.findByEmail_Value(command.email());
+        if (userOpt.isEmpty()) {
+            // Do not reveal whether email exists
+            return "ok";
+        }
+
+        var user = userOpt.get();
+
+        // Remove existing tokens for user
+        passwordResetTokenRepository.deleteByUserId(user.getId());
+
+        String token = UUID.randomUUID().toString();
+        Instant now = Instant.now();
+        Instant expiresAt = now.plus(1, ChronoUnit.HOURS);
+
+        PasswordResetToken entity = new PasswordResetToken(token, user.getId(), expiresAt, now);
+        passwordResetTokenRepository.save(entity);
+
+        // Send email (logged)
+        emailService.sendPasswordResetEmail(user.getEmail().getValue(), token);
+
+        return "ok";
+    }
+
+    @Override
+    public void handle(app.web.rtgtechnologies.rent2go.iam.domain.model.commands.ResetPasswordCommand command) {
+        var tokenOpt = passwordResetTokenRepository.findByToken(command.token());
+        var tokenEntity = tokenOpt.orElseThrow(() -> new IllegalArgumentException("Invalid token"));
+
+        if (tokenEntity.getExpiresAt().isBefore(Instant.now())) {
+            throw new IllegalArgumentException("Token expired");
+        }
+
+        var user = userRepository.findById(tokenEntity.getUserId())
+                .orElseThrow(() -> new IllegalArgumentException("User not found"));
+
+        // Validate new password via Password value object
+        app.web.rtgtechnologies.rent2go.iam.domain.model.valueobjects.Password newPassword =
+                new app.web.rtgtechnologies.rent2go.iam.domain.model.valueobjects.Password(command.newPassword());
+
+        user.setPasswordHash(newPassword.getHashedValue());
+        userRepository.save(user);
+
+        // remove token
+        passwordResetTokenRepository.deleteByUserId(user.getId());
     }
 }

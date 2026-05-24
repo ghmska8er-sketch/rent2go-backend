@@ -16,6 +16,9 @@ import app.web.rtgtechnologies.rent2go.iam.interfaces.rest.resources.AuthTokenRe
 import app.web.rtgtechnologies.rent2go.iam.interfaces.rest.resources.LoginResource;
 import app.web.rtgtechnologies.rent2go.iam.interfaces.rest.resources.RegisterUserResource;
 import app.web.rtgtechnologies.rent2go.iam.interfaces.rest.resources.UserResource;
+import app.web.rtgtechnologies.rent2go.iam.interfaces.rest.resources.VerifyEmailResource;
+import app.web.rtgtechnologies.rent2go.iam.interfaces.rest.resources.PasswordResetRequestResource;
+import app.web.rtgtechnologies.rent2go.iam.interfaces.rest.resources.PasswordResetConfirmResource;
 import app.web.rtgtechnologies.rent2go.iam.interfaces.rest.transform.AuthTokenResourceFromUserAssembler;
 import app.web.rtgtechnologies.rent2go.iam.interfaces.rest.transform.LoginCommandFromResourceAssembler;
 import app.web.rtgtechnologies.rent2go.iam.interfaces.rest.transform.RegisterUserCommandFromResourceAssembler;
@@ -48,6 +51,34 @@ public class UserController {
         this.loginAssembler = loginAssembler;
         this.authTokenAssembler = authTokenAssembler;
         this.userResourceAssembler = userResourceAssembler;
+    }
+
+    @PostMapping("/verify")
+    public ResponseEntity<Void> verifyEmail(@Valid @RequestBody VerifyEmailResource resource) {
+        try {
+            userCommandService.handle(new app.web.rtgtechnologies.rent2go.iam.domain.model.commands.VerifyEmailCommand(
+                    resource.userId(), resource.token()
+            ));
+            return ResponseEntity.ok().build();
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().build();
+        }
+    }
+
+    @PostMapping("/password/request")
+    public ResponseEntity<Void> requestPasswordReset(@Valid @RequestBody PasswordResetRequestResource resource) {
+        userCommandService.handle(new app.web.rtgtechnologies.rent2go.iam.domain.model.commands.RequestPasswordResetCommand(resource.email()));
+        return ResponseEntity.ok().build();
+    }
+
+    @PostMapping("/password/reset")
+    public ResponseEntity<Void> confirmPasswordReset(@Valid @RequestBody PasswordResetConfirmResource resource) {
+        try {
+            userCommandService.handle(new app.web.rtgtechnologies.rent2go.iam.domain.model.commands.ResetPasswordCommand(resource.token(), resource.newPassword()));
+            return ResponseEntity.ok().build();
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().build();
+        }
     }
 
     @PostMapping("/register")

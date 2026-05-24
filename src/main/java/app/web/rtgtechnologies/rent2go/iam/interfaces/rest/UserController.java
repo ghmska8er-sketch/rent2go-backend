@@ -16,6 +16,10 @@ import app.web.rtgtechnologies.rent2go.iam.interfaces.rest.resources.AuthTokenRe
 import app.web.rtgtechnologies.rent2go.iam.interfaces.rest.resources.LoginResource;
 import app.web.rtgtechnologies.rent2go.iam.interfaces.rest.resources.RegisterUserResource;
 import app.web.rtgtechnologies.rent2go.iam.interfaces.rest.resources.UserResource;
+import app.web.rtgtechnologies.rent2go.iam.interfaces.rest.resources.VerifyEmailResource;
+import app.web.rtgtechnologies.rent2go.iam.interfaces.rest.resources.PasswordResetRequestResource;
+import app.web.rtgtechnologies.rent2go.iam.interfaces.rest.resources.PasswordResetConfirmResource;
+import app.web.rtgtechnologies.rent2go.iam.interfaces.rest.resources.SubmitKycResource;
 import app.web.rtgtechnologies.rent2go.iam.interfaces.rest.transform.AuthTokenResourceFromUserAssembler;
 import app.web.rtgtechnologies.rent2go.iam.interfaces.rest.transform.LoginCommandFromResourceAssembler;
 import app.web.rtgtechnologies.rent2go.iam.interfaces.rest.transform.RegisterUserCommandFromResourceAssembler;
@@ -50,6 +54,34 @@ public class UserController {
         this.userResourceAssembler = userResourceAssembler;
     }
 
+    @PostMapping("/verify")
+    public ResponseEntity<Void> verifyEmail(@Valid @RequestBody VerifyEmailResource resource) {
+        try {
+            userCommandService.handle(new app.web.rtgtechnologies.rent2go.iam.domain.model.commands.VerifyEmailCommand(
+                    resource.userId(), resource.token()
+            ));
+            return ResponseEntity.ok().build();
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().build();
+        }
+    }
+
+    @PostMapping("/password/request")
+    public ResponseEntity<Void> requestPasswordReset(@Valid @RequestBody PasswordResetRequestResource resource) {
+        userCommandService.handle(new app.web.rtgtechnologies.rent2go.iam.domain.model.commands.RequestPasswordResetCommand(resource.email()));
+        return ResponseEntity.ok().build();
+    }
+
+    @PostMapping("/password/reset")
+    public ResponseEntity<Void> confirmPasswordReset(@Valid @RequestBody PasswordResetConfirmResource resource) {
+        try {
+            userCommandService.handle(new app.web.rtgtechnologies.rent2go.iam.domain.model.commands.ResetPasswordCommand(resource.token(), resource.newPassword()));
+            return ResponseEntity.ok().build();
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().build();
+        }
+    }
+
     @PostMapping("/register")
     public ResponseEntity<UserResource> registerUser(@Valid @RequestBody RegisterUserResource resource) {
         try {
@@ -64,16 +96,24 @@ public class UserController {
         }
     }
 
+    @PostMapping("/kyc")
+    public ResponseEntity<Void> submitKyc(@Valid @RequestBody SubmitKycResource resource) {
+        Long id = userCommandService.handle(new app.web.rtgtechnologies.rent2go.iam.domain.model.commands.SubmitKycCommand(
+                resource.userId(), resource.fullName(), resource.idNumber(), resource.documentUrl()
+        ));
+        return ResponseEntity.status(HttpStatus.CREATED).build();
+    }
+
     @PostMapping("/login")
     public ResponseEntity<AuthTokenResource> login(@RequestBody LoginResource resource) {
         try {
             LoginCommand command = loginAssembler.toCommandFromResource(resource);
-            String token = userCommandService.handle(command);
+            String tokenOrFlag = userCommandService.handle(command);
 
             User user = userQueryService.handle(new app.web.rtgtechnologies.rent2go.iam.domain.model.queries.GetUserByEmailQuery(resource.email()))
                     .orElseThrow(() -> new IllegalArgumentException("User not found"));
 
-            AuthTokenResource response = authTokenAssembler.toResourceFromUser(user, token);
+            AuthTokenResource response = authTokenAssembler.toResourceFromUser(user, tokenOrFlag);
             return ResponseEntity.ok(response);
         } catch (IllegalArgumentException e) {
             throw new IllegalArgumentException(e.getMessage());

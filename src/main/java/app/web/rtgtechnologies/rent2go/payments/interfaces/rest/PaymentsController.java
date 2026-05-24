@@ -15,6 +15,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.validation.annotation.Validated;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -29,11 +30,14 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.beans.factory.annotation.Value;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Positive;
 
 
 @RestController
 @RequestMapping("/api/v1/payments")
 @RequiredArgsConstructor
+@Validated
 public class PaymentsController {
 
     private final FareCalculationServiceImpl fareCalculationService;
@@ -46,10 +50,6 @@ public class PaymentsController {
 
     @PostMapping("/calculate")
     public ResponseEntity<MoneyResource> calculateFare(@Valid @RequestBody CalculateFareRequest request) {
-        if (request == null || request.getBaseAmount() == null || request.getCurrency() == null) {
-            return ResponseEntity.badRequest().build();
-        }
-
         Money base = Money.of(request.getBaseAmount(), request.getCurrency());
 
         BigDecimal subtotal = request.getBaseAmount();
@@ -173,9 +173,9 @@ public class PaymentsController {
     @GetMapping("/owners/{ownerId}/earnings")
     @PreAuthorize("hasRole('USER')")
     public ResponseEntity<EarningsReportResource> getOwnerEarnings(
-            @PathVariable Long ownerId,
-            @RequestParam String from,
-            @RequestParam String to) {
+            @PathVariable @Positive(message = "Owner ID must be positive") Long ownerId,
+            @RequestParam @NotBlank(message = "From date is required") String from,
+            @RequestParam @NotBlank(message = "To date is required") String to) {
         try {
             var fromDate = LocalDate.parse(from).atStartOfDay();
             var toDate = LocalDate.parse(to).atTime(23, 59, 59);

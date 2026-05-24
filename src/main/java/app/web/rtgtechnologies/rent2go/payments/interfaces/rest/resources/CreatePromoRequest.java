@@ -3,10 +3,12 @@ package app.web.rtgtechnologies.rent2go.payments.interfaces.rest.resources;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
 import java.math.BigDecimal;
 
 public class CreatePromoRequest {
     @NotBlank(message = "Promo code is required")
+    @Size(max = 50, message = "Promo code must be at most 50 characters")
     private String code;
 
     @NotNull(message = "Percentage is required")

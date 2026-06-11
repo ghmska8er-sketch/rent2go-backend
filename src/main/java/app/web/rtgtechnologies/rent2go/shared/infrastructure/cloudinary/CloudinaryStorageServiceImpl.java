@@ -48,6 +48,9 @@ public class CloudinaryStorageServiceImpl implements CloudinaryStorageService {
                 .build();
 
         try {
+            System.out.println("URL = " + url);
+            System.out.println("Cloud Name = " + props.getCloudName());
+            System.out.println("Upload Preset = " + props.getUploadPreset());
             HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
             if (response.statusCode() >= 200 && response.statusCode() < 300) {
                 JsonNode node = objectMapper.readTree(response.body());

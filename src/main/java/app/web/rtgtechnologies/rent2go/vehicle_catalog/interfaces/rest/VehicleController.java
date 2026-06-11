@@ -232,9 +232,9 @@ public class VehicleController {
     @Operation(summary = "Upload a vehicle image (multipart file)")
     public ResponseEntity<VehicleResource> uploadVehicleImageFile(
         @PathVariable Long id,
-        @RequestPart("file") org.springframework.web.multipart.MultipartFile file,
-        @RequestPart(value = "isPrimary", required = false) Boolean isPrimary,
-        @RequestPart(value = "imageOrder", required = false) Integer imageOrder
+        @RequestParam("file") org.springframework.web.multipart.MultipartFile file,
+        @RequestParam(value = "isPrimary", required = false) Boolean isPrimary,
+        @RequestParam(value = "imageOrder", required = false) Integer imageOrder
     ) throws java.io.IOException {
 
         String imageUrl = cloudinaryStorageService.upload(file);
@@ -251,29 +251,24 @@ public class VehicleController {
      * POST /api/v1/vehicles/{id}/images/upload/batch
      *
      * Upload multiple image files for a vehicle in a single multipart request.
-     * The request should include multiple `files` parts and optional parallel arrays
-     * `isPrimary` and `imageOrder` to provide metadata per file (order must match files order).
+     * The request should include multiple `files` parts.
+     * No isPrimary or imageOrder parameters are accepted for batch uploads.
      */
     @PostMapping(path = "/{id}/images/upload/batch", consumes = {"multipart/form-data"})
     @PreAuthorize("hasRole('USER')")
     @Operation(summary = "Upload multiple vehicle images (multipart batch)")
     public ResponseEntity<VehicleResource> uploadVehicleImagesBatchMultipart(
         @PathVariable Long id,
-        @RequestPart("files") java.util.List<org.springframework.web.multipart.MultipartFile> files,
-        @RequestPart(value = "isPrimary", required = false) java.util.List<Boolean> isPrimaryList,
-        @RequestPart(value = "imageOrder", required = false) java.util.List<Integer> imageOrderList
+        @RequestParam("files") java.util.List<org.springframework.web.multipart.MultipartFile> files
     ) throws java.io.IOException {
 
         Vehicle vehicle = null;
 
-        for (int i = 0; i < files.size(); i++) {
-            org.springframework.web.multipart.MultipartFile f = files.get(i);
+        for (org.springframework.web.multipart.MultipartFile f : files) {
             String imageUrl = cloudinaryStorageService.upload(f);
 
-            Boolean isPrimary = (isPrimaryList != null && isPrimaryList.size() > i) ? isPrimaryList.get(i) : null;
-            Integer order = (imageOrderList != null && imageOrderList.size() > i) ? imageOrderList.get(i) : null;
-
-            UploadVehicleImageResource resource = new UploadVehicleImageResource(null, imageUrl, isPrimary, order);
+            // imagePath as empty string, imageUrl from Cloudinary
+            UploadVehicleImageResource resource = new UploadVehicleImageResource("", imageUrl, null, null);
             var command = UploadVehicleImageCommandFromResourceAssembler.toCommand(id, resource);
             vehicle = vehicleCommandService.handle(command);
         }

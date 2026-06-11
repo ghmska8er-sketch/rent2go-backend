@@ -154,12 +154,13 @@ public class VehicleCommandServiceImpl implements VehicleCommandService {
      * @param command UploadVehicleImageCommand with vehicle ID and image details
      * @return Updated Vehicle aggregate with new image
      * @throws IllegalArgumentException if vehicle not found
-     * @throws IllegalArgumentException if imagePath is empty
+     * @throws IllegalArgumentException if both imagePath and imageUrl are empty
      */
     @Override
     public Vehicle handle(UploadVehicleImageCommand command) {
-        if (command.imagePath() == null || command.imagePath().isBlank()) {
-            throw new IllegalArgumentException("Image path cannot be empty");
+        if ((command.imagePath() == null || command.imagePath().isBlank()) &&
+            (command.imageUrl() == null || command.imageUrl().isBlank())) {
+            throw new IllegalArgumentException("At least one of imagePath or imageUrl must be provided");
         }
 
         Vehicle vehicle = vehicleRepository.findById(command.vehicleId())

@@ -18,7 +18,7 @@ import java.time.LocalDateTime;
  * Invariants:
  * - Each vehicle can have multiple images
  * - Only one image can be primary (isPrimary = true)
- * - Image path must not be empty
+ * - At least one of imagePath or imageUrl must be set
  * - uploadDate must be set on creation
  * 
  * DDD: This is an entity, not an aggregate root. It only exists in the context
@@ -36,7 +36,8 @@ public class VehicleImage extends AuditableAbstractAggregateRoot<VehicleImage> {
     @JoinColumn(name = "vehicle_id", nullable = false)
     private Vehicle vehicle;
 
-    @Column(nullable = false, length = 500)
+    //nullable
+    @Column(length = 500)
     private String imagePath;
 
     @Column(nullable = false)
@@ -45,7 +46,7 @@ public class VehicleImage extends AuditableAbstractAggregateRoot<VehicleImage> {
     @Column(nullable = false)
     private LocalDateTime uploadDate;
 
-    @Column(length = 255)
+    @Column(length = 1000)
     private String imageUrl;
 
     // ========== Business Logic ==========

@@ -38,6 +38,8 @@ public class VehicleResource {
     private Integer seats;
     private String transmission;
     private String fuelType;
+    private BigDecimal latitude;
+    private BigDecimal longitude;
     private List<String> features;
     private String primaryImageUrl;
     private String primaryImagePath;

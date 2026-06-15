@@ -3,6 +3,8 @@ package app.web.rtgtechnologies.rent2go.vehicle_catalog.interfaces.rest.transfor
 import app.web.rtgtechnologies.rent2go.vehicle_catalog.domain.model.commands.RegisterVehicleCommand;
 import app.web.rtgtechnologies.rent2go.vehicle_catalog.interfaces.rest.resources.CreateVehicleResource;
 
+import java.math.BigDecimal;
+
 /**
  * CreateVehicleCommandFromResourceAssembler
  *
@@ -33,7 +35,11 @@ public final class CreateVehicleCommandFromResourceAssembler {
             resource.getDescription(),
             resource.getSeats(),
             resource.getTransmission(),
-            resource.getFuelType()
+            resource.getFuelType(),
+            resource.getPrimaryImageUrl(),
+            resource.getFeatures(),
+            resource.getLatitude() != null ? BigDecimal.valueOf(resource.getLatitude()) : null,
+            resource.getLongitude() != null ? BigDecimal.valueOf(resource.getLongitude()) : null
         );
     }
 }

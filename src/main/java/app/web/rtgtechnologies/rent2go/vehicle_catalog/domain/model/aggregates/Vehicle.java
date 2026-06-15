@@ -9,10 +9,8 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
-import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
-
 /**
  * Vehicle Aggregate Root
  * 
@@ -83,6 +81,12 @@ public class Vehicle extends AuditableAbstractAggregateRoot<Vehicle> {
     @Column(name = "fuel_type", length = 20)
     private String fuelType;
 
+    @Column(name = "latitude", precision = 10, scale = 8)
+    private BigDecimal latitude;
+
+    @Column(name = "longitude", precision = 11, scale = 8)
+    private BigDecimal longitude;
+
     @Builder.Default
     @OneToMany(cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY, mappedBy = "vehicle")
     private List<VehicleImage> images = new ArrayList<>();
@@ -130,7 +134,8 @@ public class Vehicle extends AuditableAbstractAggregateRoot<Vehicle> {
      */
     public void updateDetails(VehicleCategory category, String make, String model, Integer year,
                               String location, String description, Integer seats,
-                              String transmission, String fuelType) {
+                              String transmission, String fuelType,
+                              BigDecimal latitude, BigDecimal longitude) {
         if (category == null) {
             throw new IllegalArgumentException("Category cannot be null");
         }
@@ -144,6 +149,35 @@ public class Vehicle extends AuditableAbstractAggregateRoot<Vehicle> {
         this.seats = seats;
         this.transmission = transmission;
         this.fuelType = fuelType;
+        this.latitude = latitude;
+        this.longitude = longitude;
+    }
+
+    /**
+     * Replace all features with the given feature names.
+     * Searches existing features by name or creates new ones if not found.
+     * 
+     * @param featureNames List of feature names to set
+     * @param featureRepository Repository to search/create VehicleFeature entities
+     */
+    public void updateFeatures(List<String> featureNames, 
+                               app.web.rtgtechnologies.rent2go.vehicle_catalog.infrastructure.persistence.jpa.repositories.VehicleFeatureRepository featureRepository) {
+        // Clear all existing features
+        this.features.clear();
+
+        // Add new features
+        if (featureNames != null && !featureNames.isEmpty()) {
+            for (String featureName : featureNames) {
+                VehicleFeature feature = featureRepository.findByName(featureName)
+                    .orElseGet(() -> {
+                        VehicleFeature newFeature = VehicleFeature.builder()
+                            .name(featureName)
+                            .build();
+                        return featureRepository.save(newFeature);
+                    });
+                this.addFeature(feature);
+            }
+        }
     }
 
     public void retire() {
@@ -229,6 +263,19 @@ public class Vehicle extends AuditableAbstractAggregateRoot<Vehicle> {
         selected.markAsPrimary();
         this.primaryImagePath = selected.getImagePath();
         this.primaryImageUrl = selected.getImageUrl();
+    }
+
+    /**
+     * Set the primary image URL directly (for external image URLs like Cloudinary).
+     * This does not create a VehicleImage entity; it only sets the primaryImageUrl field.
+     * 
+     * @param imageUrl The URL of the primary image
+     */
+    public void setPrimaryImage(String imageUrl) {
+        if (imageUrl == null || imageUrl.isBlank()) {
+            throw new IllegalArgumentException("Image URL cannot be null or blank");
+        }
+        this.primaryImageUrl = imageUrl;
     }
 
     /**

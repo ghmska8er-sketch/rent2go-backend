@@ -166,7 +166,57 @@ public class VehicleQueryServiceImpl implements VehicleQueryService {
                 .toList();
         }
 
+        // Filter by geographic radius (Haversine formula) if provided
+        if (criteria.hasRadius()) {
+            final double centerLat = Math.toRadians(criteria.getCenterLatitude());
+            final double centerLng = Math.toRadians(criteria.getCenterLongitude());
+            final double radiusKm = criteria.getRadiusKm();
+
+            results = results.stream()
+                .filter(v -> {
+                    BigDecimal vehicleLat = v.getLatitude();
+                    BigDecimal vehicleLng = v.getLongitude();
+                    if (vehicleLat == null || vehicleLng == null) {
+                        return false;
+                    }
+                    double distance = calculateDistanceHaversine(centerLat, centerLng,
+                        Math.toRadians(vehicleLat.doubleValue()), Math.toRadians(vehicleLng.doubleValue()));
+                    return distance <= radiusKm;
+                })
+                .toList();
+        }
+
+        // Filter by feature name if provided
+        if (criteria.getFeatureName() != null && !criteria.getFeatureName().isBlank()) {
+            final String feature = criteria.getFeatureName().toLowerCase();
+            results = results.stream()
+                .filter(v -> v.getFeatures() != null &&
+                           v.getFeatures().stream()
+                               .anyMatch(f -> f.getName() != null && f.getName().toLowerCase().contains(feature)))
+                .toList();
+        }
+
         return results;
+    }
+
+    /**
+     * Calculate distance between two points using the Haversine formula.
+     * 
+     * @param lat1 Latitude of point 1 in radians
+     * @param lng1 Longitude of point 1 in radians
+     * @param lat2 Latitude of point 2 in radians
+     * @param lng2 Longitude of point 2 in radians
+     * @return Distance in kilometers
+     */
+    private double calculateDistanceHaversine(double lat1, double lng1, double lat2, double lng2) {
+        double earthRadiusKm = 6371;
+        double dLat = Math.toRadians(lat2 - lat1);
+        double dLng = Math.toRadians(lng2 - lng1);
+        double a = Math.sin(dLat / 2) * Math.sin(dLat / 2)
+                 + Math.cos(Math.toRadians(lat1)) * Math.cos(Math.toRadians(lat2))
+                 * Math.sin(dLng / 2) * Math.sin(dLng / 2);
+        double c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+        return earthRadiusKm * c;
     }
 
     /**

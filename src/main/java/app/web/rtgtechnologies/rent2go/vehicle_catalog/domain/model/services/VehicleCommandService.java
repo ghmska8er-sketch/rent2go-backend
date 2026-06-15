@@ -3,6 +3,7 @@ package app.web.rtgtechnologies.rent2go.vehicle_catalog.domain.model.services;
 import app.web.rtgtechnologies.rent2go.vehicle_catalog.domain.model.aggregates.Vehicle;
 import app.web.rtgtechnologies.rent2go.vehicle_catalog.domain.model.aggregates.VehicleImage;
 import app.web.rtgtechnologies.rent2go.vehicle_catalog.domain.model.commands.RegisterVehicleCommand;
+import app.web.rtgtechnologies.rent2go.vehicle_catalog.domain.model.commands.RegisterVehicleWithImageCommand;
 import app.web.rtgtechnologies.rent2go.vehicle_catalog.domain.model.commands.SetPrimaryVehicleImageCommand;
 import app.web.rtgtechnologies.rent2go.vehicle_catalog.domain.model.commands.RemoveVehicleImageCommand;
 import app.web.rtgtechnologies.rent2go.vehicle_catalog.domain.model.commands.UpdateVehicleDetailsCommand;
@@ -66,4 +67,12 @@ public interface VehicleCommandService {
      * @return Updated Vehicle aggregate
      */
     Vehicle handle(SetPrimaryVehicleImageCommand command);
+
+    /**
+     * Register a new vehicle with a primary image URL
+     *
+     * @param command RegisterVehicleWithImageCommand with vehicle details and primary image URL
+     * @return Created Vehicle aggregate with primary image
+     */
+    Vehicle handle(RegisterVehicleWithImageCommand command);
 }

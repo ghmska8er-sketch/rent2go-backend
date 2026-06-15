@@ -15,7 +15,10 @@ public record UploadVehicleImageCommand(
     Boolean isPrimary
 ) {
     public UploadVehicleImageCommand {
-        if ((imagePath == null || imagePath.isBlank()) && (imageUrl == null || imageUrl.isBlank())) {
+        if (imagePath == null) {
+            imagePath = "";
+        }
+        if ((imagePath.isBlank()) && (imageUrl == null || imageUrl.isBlank())) {
             throw new IllegalArgumentException("At least one of imagePath or imageUrl must be provided");
         }
     }

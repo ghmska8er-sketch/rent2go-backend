@@ -288,7 +288,7 @@ public class VehicleController {
         String imageUrl = cloudinaryStorageService.upload(file);
 
         // Build resource and delegate to existing command flow
-        UploadVehicleImageResource resource = new UploadVehicleImageResource(null, imageUrl, isPrimary, imageOrder);
+        UploadVehicleImageResource resource = new UploadVehicleImageResource("", imageUrl, isPrimary, imageOrder);
         var command = UploadVehicleImageCommandFromResourceAssembler.toCommand(id, resource);
         Vehicle vehicle = vehicleCommandService.handle(command);
         VehicleResource response = VehicleResourceFromEntityAssembler.toResource(vehicle);

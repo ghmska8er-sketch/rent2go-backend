@@ -208,7 +208,7 @@ public class VehicleCommandServiceImpl implements VehicleCommandService {
 
         // Create new VehicleImage entity
         VehicleImage image = VehicleImage.builder()
-            .imagePath(command.imagePath())
+            .imagePath(command.imagePath() == null ? "" : command.imagePath())
             .imageUrl(command.imageUrl())
             .isPrimary(command.isPrimary() != null && command.isPrimary())
             .uploadDate(LocalDateTime.now())

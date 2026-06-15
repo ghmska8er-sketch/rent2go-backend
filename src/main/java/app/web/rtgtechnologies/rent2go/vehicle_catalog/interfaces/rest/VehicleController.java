@@ -2,7 +2,6 @@ package app.web.rtgtechnologies.rent2go.vehicle_catalog.interfaces.rest;
 
 import app.web.rtgtechnologies.rent2go.vehicle_catalog.domain.model.aggregates.Vehicle;
 import app.web.rtgtechnologies.rent2go.vehicle_catalog.domain.model.aggregates.VehicleImage;
-import app.web.rtgtechnologies.rent2go.vehicle_catalog.domain.model.commands.RegisterVehicleWithImageCommand;
 import app.web.rtgtechnologies.rent2go.vehicle_catalog.domain.model.queries.GetVehicleDetailsQuery;
 import app.web.rtgtechnologies.rent2go.vehicle_catalog.domain.model.queries.GetVehicleImagesQuery;
 import app.web.rtgtechnologies.rent2go.vehicle_catalog.domain.model.queries.GetVehiclesByOwnerQuery;
@@ -389,6 +388,25 @@ public class VehicleController {
     ) {
         List<VehicleImage> images = vehicleQueryService.handle(new GetVehicleImagesQuery(id));
         return ResponseEntity.ok(toPagedResponse(images, page, size, VehicleImageResourceFromEntityAssembler::toResource));
+    }
+
+    /**
+     * DELETE /api/v1/vehicles/{id}/images/{imageId}
+     *
+     * Remove an image from a vehicle.
+     * If the removed image is the primary, the next image in order becomes primary.
+     */
+    @DeleteMapping("/{id}/images/{imageId}")
+    @PreAuthorize("hasRole('USER')")
+    @Operation(summary = "Remove an image from a vehicle")
+    public ResponseEntity<VehicleResource> removeVehicleImage(
+        @PathVariable Long id,
+        @PathVariable Long imageId
+    ) {
+        var command = new app.web.rtgtechnologies.rent2go.vehicle_catalog.domain.model.commands.RemoveVehicleImageCommand(id, imageId);
+        Vehicle vehicle = vehicleCommandService.handle(command);
+        VehicleResource response = VehicleResourceFromEntityAssembler.toResource(vehicle);
+        return ResponseEntity.ok(response);
     }
 
     private Long extractUserIdFromAuthHeader(String authHeader) {

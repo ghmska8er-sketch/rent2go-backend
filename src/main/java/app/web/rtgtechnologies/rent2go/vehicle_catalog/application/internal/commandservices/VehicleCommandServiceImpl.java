@@ -112,6 +112,17 @@ public class VehicleCommandServiceImpl implements VehicleCommandService {
             }
         }
 
+        // Persist primary image in vehicle_images table if primaryImageUrl is provided
+        if (command.primaryImageUrl() != null && !command.primaryImageUrl().isBlank()) {
+            VehicleImage image = VehicleImage.builder()
+                .imagePath("")
+                .imageUrl(command.primaryImageUrl())
+                .isPrimary(true)
+                .uploadDate(LocalDateTime.now())
+                .build();
+            vehicle.addImage(image);
+        }
+
         // Persist and return domain aggregate (not DTO)
         return vehicleRepository.save(vehicle);
     }
@@ -306,14 +317,16 @@ public class VehicleCommandServiceImpl implements VehicleCommandService {
             .longitude(command.longitude())
             .build();
 
-        // Set primary image if imageUrl is provided
+        // Persist image in vehicle_images table if imageUrl is provided
         if (command.imageUrl() != null && !command.imageUrl().isBlank()) {
-            vehicle.setPrimaryImage(command.imageUrl());
+            VehicleImage image = VehicleImage.builder()
+                .imagePath("")
+                .imageUrl(command.imageUrl())
+                .isPrimary(true)
+                .uploadDate(LocalDateTime.now())
+                .build();
+            vehicle.addImage(image);
         }
-
-        // Persist features: search existing or create new ones
-        // Note: featureNames is not supported in this command (null)
-        // Users should use POST /features first, then link by name via POST /vehicles
 
         // Persist and return domain aggregate (not DTO)
         return vehicleRepository.save(vehicle);

@@ -27,6 +27,7 @@ import app.web.rtgtechnologies.rent2go.vehicle_catalog.interfaces.rest.transform
 import app.web.rtgtechnologies.rent2go.shared.infrastructure.cloudinary.CloudinaryStorageService;
 import app.web.rtgtechnologies.rent2go.iam.infrastructure.services.JwtTokenProvider;
 import app.web.rtgtechnologies.rent2go.shared.interfaces.rest.resource.PagedResponse;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;

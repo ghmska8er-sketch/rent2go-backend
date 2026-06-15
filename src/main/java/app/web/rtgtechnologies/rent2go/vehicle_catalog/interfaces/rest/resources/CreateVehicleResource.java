@@ -63,4 +63,10 @@ public class CreateVehicleResource {
 
     @NotBlank(message = "Fuel type is required")
     private String fuelType;
+
+    private List<String> features;
+
+    private Double latitude;
+
+    private Double longitude;
 }

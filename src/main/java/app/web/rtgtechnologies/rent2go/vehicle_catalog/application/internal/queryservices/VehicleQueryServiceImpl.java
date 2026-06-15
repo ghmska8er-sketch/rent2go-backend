@@ -166,6 +166,32 @@ public class VehicleQueryServiceImpl implements VehicleQueryService {
                 .toList();
         }
 
+        // Filter by latitude if provided
+        if (criteria.getLatitude() != null) {
+            final double lat = criteria.getLatitude();
+            results = results.stream()
+                .filter(v -> v.getLatitude() != null && v.getLatitude().doubleValue() == lat)
+                .toList();
+        }
+
+        // Filter by longitude if provided
+        if (criteria.getLongitude() != null) {
+            final double lng = criteria.getLongitude();
+            results = results.stream()
+                .filter(v -> v.getLongitude() != null && v.getLongitude().doubleValue() == lng)
+                .toList();
+        }
+
+        // Filter by feature name if provided
+        if (criteria.getFeatureName() != null && !criteria.getFeatureName().isBlank()) {
+            final String feature = criteria.getFeatureName().toLowerCase();
+            results = results.stream()
+                .filter(v -> v.getFeatures() != null &&
+                           v.getFeatures().stream()
+                               .anyMatch(f -> f.getName() != null && f.getName().toLowerCase().contains(feature)))
+                .toList();
+        }
+
         return results;
     }
 

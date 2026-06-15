@@ -41,6 +41,7 @@ public class VehicleFeatureController {
      * GET /api/v1/features
      *
      * List all available vehicle features.
+     * Public endpoint — no authentication required.
      */
     @GetMapping
     @Operation(summary = "List all vehicle features")
@@ -56,6 +57,7 @@ public class VehicleFeatureController {
      * GET /api/v1/features/{id}
      *
      * Get a vehicle feature by ID.
+     * Public endpoint — no authentication required.
      */
     @GetMapping("/{id}")
     @Operation(summary = "Get a vehicle feature by ID")
@@ -71,6 +73,7 @@ public class VehicleFeatureController {
      * GET /api/v1/features/name/{name}
      *
      * Get a vehicle feature by name (for autocomplete/search).
+     * Public endpoint — no authentication required.
      */
     @GetMapping("/name/{name}")
     @Operation(summary = "Get a vehicle feature by name")

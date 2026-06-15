@@ -1,6 +1,7 @@
 package app.web.rtgtechnologies.rent2go.vehicle_catalog.domain.model.commands;
 
 import java.math.BigDecimal;
+import java.util.List;
 
 /**
  * RegisterVehicleCommand

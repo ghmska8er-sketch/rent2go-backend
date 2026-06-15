@@ -128,9 +128,7 @@ public class VehicleFeatureController {
             }
         });
 
-        feature.setName(resource.getName());
-        feature.setDescription(resource.getDescription());
-        feature.setIconUrl(resource.getIconUrl());
+        feature.update(resource.getName(), resource.getDescription(), resource.getIconUrl());
 
         VehicleFeature updated = vehicleFeatureRepository.save(feature);
         VehicleFeatureResource response = VehicleFeatureResourceFromEntityAssembler.toResource(updated);

@@ -29,4 +29,21 @@ public class VehicleFeature extends AuditableAbstractAggregateRoot<VehicleFeatur
 
     @Column(name = "icon_url", length = 255)
     private String iconUrl;
+
+    // ========== Business Logic ==========
+
+    /**
+     * Update this feature's properties.
+     */
+    public void update(String name, String description, String iconUrl) {
+        if (name != null && !name.isBlank()) {
+            this.name = name;
+        }
+        if (description != null) {
+            this.description = description;
+        }
+        if (iconUrl != null) {
+            this.iconUrl = iconUrl;
+        }
+    }
 }

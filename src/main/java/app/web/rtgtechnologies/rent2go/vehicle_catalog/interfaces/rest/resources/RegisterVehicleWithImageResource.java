@@ -1,25 +1,25 @@
 package app.web.rtgtechnologies.rent2go.vehicle_catalog.interfaces.rest.resources;
 
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-import jakarta.validation.constraints.*;
 import java.math.BigDecimal;
-import java.util.List;
 
 /**
- * CreateVehicleResource
+ * RegisterVehicleWithImageResource
  *
- * Request DTO for vehicle registration.
- * Carries data from HTTP layer to the application layer.
+ * Request DTO for creating a vehicle with a primary image URL.
+ * Used by the POST /vehicles/with-image endpoint.
  *
  * Hexagonal Architecture: Request resource (interfaces layer)
  */
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-public class CreateVehicleResource {
+public class RegisterVehicleWithImageResource {
 
     @NotBlank(message = "License plate is required")
     private String licensePlate;
@@ -31,15 +31,12 @@ public class CreateVehicleResource {
     private String model;
 
     @NotNull(message = "Year is required")
-    @Min(value = 1900, message = "Year must be valid")
-    @Max(value = 2099, message = "Year must be valid")
     private Integer year;
 
     @NotBlank(message = "VIN is required")
     private String vin;
 
     @NotNull(message = "Daily price is required")
-    @DecimalMin(value = "0.01", message = "Daily price must be greater than 0")
     private BigDecimal dailyPrice;
 
     @NotNull(message = "Category ID is required")
@@ -50,12 +47,6 @@ public class CreateVehicleResource {
 
     private String description;
 
-    private List<String> features;
-
-    private String primaryImageUrl;
-
-    @NotNull(message = "Number of seats is required")
-    @Min(value = 1, message = "Vehicle must have at least 1 seat")
     private Integer seats;
 
     @NotBlank(message = "Transmission type is required")
@@ -63,6 +54,8 @@ public class CreateVehicleResource {
 
     @NotBlank(message = "Fuel type is required")
     private String fuelType;
+
+    private String primaryImageUrl;
 
     private Double latitude;
 

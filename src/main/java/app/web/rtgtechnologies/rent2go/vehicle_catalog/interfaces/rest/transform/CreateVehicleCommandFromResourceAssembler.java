@@ -3,6 +3,8 @@ package app.web.rtgtechnologies.rent2go.vehicle_catalog.interfaces.rest.transfor
 import app.web.rtgtechnologies.rent2go.vehicle_catalog.domain.model.commands.RegisterVehicleCommand;
 import app.web.rtgtechnologies.rent2go.vehicle_catalog.interfaces.rest.resources.CreateVehicleResource;
 
+import java.math.BigDecimal;
+
 /**
  * CreateVehicleCommandFromResourceAssembler
  *

@@ -10,12 +10,14 @@ import app.web.rtgtechnologies.rent2go.vehicle_catalog.domain.model.services.Veh
 import app.web.rtgtechnologies.rent2go.vehicle_catalog.domain.model.services.VehicleQueryService;
 import app.web.rtgtechnologies.rent2go.vehicle_catalog.domain.model.valueobjects.SearchCriteria;
 import app.web.rtgtechnologies.rent2go.vehicle_catalog.interfaces.rest.resources.CreateVehicleResource;
+import app.web.rtgtechnologies.rent2go.vehicle_catalog.interfaces.rest.resources.RegisterVehicleWithImageResource;
 import app.web.rtgtechnologies.rent2go.vehicle_catalog.interfaces.rest.resources.UpdateVehicleDetailsResource;
 import app.web.rtgtechnologies.rent2go.vehicle_catalog.interfaces.rest.resources.UpdateVehiclePricingResource;
 import app.web.rtgtechnologies.rent2go.vehicle_catalog.interfaces.rest.resources.UploadVehicleImageResource;
 import app.web.rtgtechnologies.rent2go.vehicle_catalog.interfaces.rest.resources.VehicleImageResource;
 import app.web.rtgtechnologies.rent2go.vehicle_catalog.interfaces.rest.resources.VehicleResource;
 import app.web.rtgtechnologies.rent2go.vehicle_catalog.interfaces.rest.transform.CreateVehicleCommandFromResourceAssembler;
+import app.web.rtgtechnologies.rent2go.vehicle_catalog.interfaces.rest.transform.RegisterVehicleWithImageCommandFromResourceAssembler;
 import app.web.rtgtechnologies.rent2go.vehicle_catalog.interfaces.rest.transform.UpdateVehicleDetailsCommandFromResourceAssembler;
 import app.web.rtgtechnologies.rent2go.vehicle_catalog.interfaces.rest.transform.UpdateVehiclePricingCommandFromResourceAssembler;
 import app.web.rtgtechnologies.rent2go.vehicle_catalog.interfaces.rest.transform.UploadVehicleImageCommandFromResourceAssembler;
@@ -80,6 +82,33 @@ public class VehicleController {
 
         // Convert resource to command using assembler
         var command = CreateVehicleCommandFromResourceAssembler.toCommand(ownerId, request);
+
+        // Execute command
+        Vehicle vehicle = vehicleCommandService.handle(command);
+
+        // Convert entity to resource using assembler
+        VehicleResource response = VehicleResourceFromEntityAssembler.toResource(vehicle);
+
+        return ResponseEntity.status(HttpStatus.CREATED).body(response);
+    }
+
+    /**
+     * POST /api/v1/vehicles/with-image
+     *
+     * Register a new vehicle with a primary image URL.
+     * The image URL is set as the primary image during creation.
+     */
+    @PostMapping("/with-image")
+    @PreAuthorize("hasRole('USER')")
+    @Operation(summary = "Publish a new vehicle with a primary image URL")
+    public ResponseEntity<VehicleResource> registerVehicleWithImage(
+        @RequestHeader(value = "Authorization", required = false) String authHeader,
+        @RequestBody @Valid RegisterVehicleWithImageResource request
+    ) {
+        Long ownerId = extractUserIdFromAuthHeader(authHeader);
+
+        // Convert resource to command using assembler
+        var command = RegisterVehicleWithImageCommandFromResourceAssembler.toCommand(ownerId, request);
 
         // Execute command
         Vehicle vehicle = vehicleCommandService.handle(command);

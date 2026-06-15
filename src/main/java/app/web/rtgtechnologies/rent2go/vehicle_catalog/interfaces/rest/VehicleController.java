@@ -171,8 +171,9 @@ public class VehicleController {
         @RequestParam(required = false) String transmission,
         @RequestParam(required = false) String fuelType,
         @RequestParam(required = false) String location,
-        @RequestParam(required = false) Double latitude,
-        @RequestParam(required = false) Double longitude,
+        @RequestParam(required = false) Double centerLatitude,
+        @RequestParam(required = false) Double centerLongitude,
+        @RequestParam(required = false) Double radiusKm,
         @RequestParam(required = false) String featureName,
         @RequestParam(defaultValue = "0") @Min(value = 0, message = "Page must be greater than or equal to 0") int page,
         @RequestParam(defaultValue = "20") @Min(value = 1, message = "Size must be greater than 0") @Max(value = 100, message = "Size must be at most 100") int size
@@ -187,8 +188,9 @@ public class VehicleController {
             transmission,
             fuelType,
             location,
-            latitude,
-            longitude,
+            centerLatitude,
+            centerLongitude,
+            radiusKm,
             featureName
         );
 

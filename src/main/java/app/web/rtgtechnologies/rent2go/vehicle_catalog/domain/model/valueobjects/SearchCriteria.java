@@ -44,8 +44,9 @@ public class SearchCriteria extends ValueObject {
     private String transmission;
     private String fuelType;
     private String location;
-    private Double latitude;
-    private Double longitude;
+    private Double centerLatitude;
+    private Double centerLongitude;
+    private Double radiusKm;
     private String featureName;
 
     // ========== Factory Methods ==========
@@ -55,21 +56,28 @@ public class SearchCriteria extends ValueObject {
      */
     public static SearchCriteria byPriceRange(BigDecimal minPrice, BigDecimal maxPrice) {
         validatePriceRange(minPrice, maxPrice);
-        return new SearchCriteria(null, minPrice, maxPrice, null, null, null, null, null, null, null, null, null);
+        return new SearchCriteria(null, minPrice, maxPrice, null, null, null, null, null, null, null, null, null, null);
     }
 
     /**
      * Create search criteria with categories only.
      */
     public static SearchCriteria byCategories(List<String> categories) {
-        return new SearchCriteria(categories, null, null, null, null, null, null, null, null, null, null, null);
+        return new SearchCriteria(categories, null, null, null, null, null, null, null, null, null, null, null, null);
     }
 
     /**
      * Create search criteria with location only.
      */
     public static SearchCriteria byLocation(String location) {
-        return new SearchCriteria(null, null, null, null, null, null, null, null, location, null, null, null);
+        return new SearchCriteria(null, null, null, null, null, null, null, null, location, null, null, null, null);
+    }
+
+    /**
+     * Create search criteria with geographic radius filter.
+     */
+    public static SearchCriteria byRadius(Double centerLatitude, Double centerLongitude, Double radiusKm) {
+        return new SearchCriteria(null, null, null, null, null, null, null, null, null, centerLatitude, centerLongitude, radiusKm, null);
     }
 
     /**
@@ -85,14 +93,15 @@ public class SearchCriteria extends ValueObject {
         String transmission,
         String fuelType,
         String location,
-        Double latitude,
-        Double longitude,
+        Double centerLatitude,
+        Double centerLongitude,
+        Double radiusKm,
         String featureName
     ) {
         if (minPrice != null && maxPrice != null) {
             validatePriceRange(minPrice, maxPrice);
         }
-        return new SearchCriteria(categories, minPrice, maxPrice, minYear, maxYear, seats, transmission, fuelType, location, latitude, longitude, featureName);
+        return new SearchCriteria(categories, minPrice, maxPrice, minYear, maxYear, seats, transmission, fuelType, location, centerLatitude, centerLongitude, radiusKm, featureName);
     }
 
     // ========== Validation ==========
@@ -173,6 +182,14 @@ public class SearchCriteria extends ValueObject {
      */
     public boolean hasLocation() {
         return location != null && !location.isBlank();
+    }
+
+    /**
+     * Check if this criteria filters by geographic radius.
+     * Requires all three: centerLatitude, centerLongitude, and radiusKm.
+     */
+    public boolean hasRadius() {
+        return centerLatitude != null && centerLongitude != null && radiusKm != null;
     }
 
     // ========== Value Object Contract ==========

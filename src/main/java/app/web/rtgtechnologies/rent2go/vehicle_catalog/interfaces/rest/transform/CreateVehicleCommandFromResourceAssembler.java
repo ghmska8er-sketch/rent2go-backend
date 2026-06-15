@@ -36,6 +36,7 @@ public final class CreateVehicleCommandFromResourceAssembler {
             resource.getSeats(),
             resource.getTransmission(),
             resource.getFuelType(),
+            resource.getPrimaryImageUrl(),
             resource.getFeatures(),
             resource.getLatitude() != null ? BigDecimal.valueOf(resource.getLatitude()) : null,
             resource.getLongitude() != null ? BigDecimal.valueOf(resource.getLongitude()) : null

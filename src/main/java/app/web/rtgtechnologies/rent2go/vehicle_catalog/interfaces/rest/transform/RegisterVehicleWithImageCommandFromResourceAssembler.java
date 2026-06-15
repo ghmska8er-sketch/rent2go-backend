@@ -22,7 +22,7 @@ public final class RegisterVehicleWithImageCommandFromResourceAssembler {
      * @param resource RegisterVehicleWithImageResource from HTTP layer
      * @return RegisterVehicleWithImageCommand for domain layer
      */
-    public static RegisterVehicleWithImageCommand toCommand(Long ownerId, RegisterVehicleWithImageResource resource) {
+    public static RegisterVehicleWithImageCommand toCommand(Long ownerId, RegisterVehicleWithImageResource resource, String imageUrl) {
         return new RegisterVehicleWithImageCommand(
             ownerId,
             resource.getLicensePlate(),
@@ -37,10 +37,10 @@ public final class RegisterVehicleWithImageCommandFromResourceAssembler {
             resource.getSeats(),
             resource.getTransmission(),
             resource.getFuelType(),
-            null, // featureNames — not supported in this endpoint; use POST /features first
+            resource.getFeatureNames(),
             resource.getLatitude() != null ? BigDecimal.valueOf(resource.getLatitude()) : null,
             resource.getLongitude() != null ? BigDecimal.valueOf(resource.getLongitude()) : null,
-            resource.getPrimaryImageUrl()
+            imageUrl
         );
     }
 }

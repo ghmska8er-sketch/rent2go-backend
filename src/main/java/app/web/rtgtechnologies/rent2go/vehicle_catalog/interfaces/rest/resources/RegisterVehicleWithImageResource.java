@@ -7,12 +7,13 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
+import java.util.List;
 
 /**
  * RegisterVehicleWithImageResource
  *
- * Request DTO for creating a vehicle with a primary image URL.
- * Used by the POST /vehicles/with-image endpoint.
+ * Request DTO for creating a vehicle with a primary image file upload.
+ * Used by the POST /vehicles/with-image endpoint with multipart/form-data.
  *
  * Hexagonal Architecture: Request resource (interfaces layer)
  */
@@ -55,9 +56,9 @@ public class RegisterVehicleWithImageResource {
     @NotBlank(message = "Fuel type is required")
     private String fuelType;
 
-    private String primaryImageUrl;
-
     private Double latitude;
 
     private Double longitude;
+
+    private List<String> featureNames;
 }

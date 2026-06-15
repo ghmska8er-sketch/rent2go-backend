@@ -2,6 +2,7 @@ package app.web.rtgtechnologies.rent2go.vehicle_catalog.interfaces.rest;
 
 import app.web.rtgtechnologies.rent2go.vehicle_catalog.domain.model.aggregates.Vehicle;
 import app.web.rtgtechnologies.rent2go.vehicle_catalog.domain.model.aggregates.VehicleImage;
+import app.web.rtgtechnologies.rent2go.vehicle_catalog.domain.model.commands.RegisterVehicleWithImageCommand;
 import app.web.rtgtechnologies.rent2go.vehicle_catalog.domain.model.queries.GetVehicleDetailsQuery;
 import app.web.rtgtechnologies.rent2go.vehicle_catalog.domain.model.queries.GetVehicleImagesQuery;
 import app.web.rtgtechnologies.rent2go.vehicle_catalog.domain.model.queries.GetVehiclesByOwnerQuery;
@@ -95,20 +96,30 @@ public class VehicleController {
     /**
      * POST /api/v1/vehicles/with-image
      *
-     * Register a new vehicle with a primary image URL.
-     * The image URL is set as the primary image during creation.
+     * Register a new vehicle with a primary image file upload.
+     * The image file is uploaded to Cloudinary and the returned URL is set as the primary image.
+     * This endpoint accepts multipart/form-data with a vehicle JSON body and an image file.
      */
-    @PostMapping("/with-image")
+    @PostMapping(path = "/with-image", consumes = {"multipart/form-data"})
     @PreAuthorize("hasRole('USER')")
-    @Operation(summary = "Publish a new vehicle with a primary image URL")
-    public ResponseEntity<VehicleResource> registerVehicleWithImage(
+    @Operation(summary = "Publish a new vehicle with a primary image file upload")
+    public ResponseEntity<VehicleResource> registerVehicleWithImageFile(
         @RequestHeader(value = "Authorization", required = false) String authHeader,
-        @RequestBody @Valid RegisterVehicleWithImageResource request
-    ) {
+        @RequestPart("vehicle") String vehicleJson,
+        @RequestPart("file") org.springframework.web.multipart.MultipartFile file
+    ) throws java.io.IOException {
+
         Long ownerId = extractUserIdFromAuthHeader(authHeader);
 
+        // Parse JSON to resource manually to avoid Content-Type issues
+        ObjectMapper mapper = new ObjectMapper();
+        RegisterVehicleWithImageResource vehicleResource = mapper.readValue(vehicleJson, RegisterVehicleWithImageResource.class);
+
+        // Upload image to Cloudinary
+        String imageUrl = cloudinaryStorageService.upload(file);
+
         // Convert resource to command using assembler
-        var command = RegisterVehicleWithImageCommandFromResourceAssembler.toCommand(ownerId, request);
+        var command = RegisterVehicleWithImageCommandFromResourceAssembler.toCommand(ownerId, vehicleResource, imageUrl);
 
         // Execute command
         Vehicle vehicle = vehicleCommandService.handle(command);

@@ -24,6 +24,7 @@ public record RegisterVehicleCommand(
     Integer seats,
     String transmission,
     String fuelType,
+    String primaryImageUrl,
     List<String> featureNames,
     BigDecimal latitude,
     BigDecimal longitude

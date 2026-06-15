@@ -9,6 +9,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
+import org.springframework.security.access.prepost.PreAuthorize;
 import lombok.AllArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -44,6 +45,7 @@ public class VehicleFeatureController {
      * Public endpoint — no authentication required.
      */
     @GetMapping
+    @PreAuthorize("permitAll()")
     @Operation(summary = "List all vehicle features")
     public ResponseEntity<List<VehicleFeatureResource>> listFeatures() {
         List<VehicleFeature> features = vehicleFeatureRepository.findAll();

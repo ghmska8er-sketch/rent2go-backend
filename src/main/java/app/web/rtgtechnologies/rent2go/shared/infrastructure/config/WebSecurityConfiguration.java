@@ -90,6 +90,9 @@ public class WebSecurityConfiguration {
                         "/api/v1/vehicles/*",
                         "/api/v1/vehicles/*/images",
                         "/api/v1/availability/vehicle/*/check",
+                        "/api/v1/features",
+                        "/api/v1/features/*",
+                        "/api/v1/features/name/*",
                         "/api/v1/payments/promocodes/*").permitAll()
                     .requestMatchers(
                         "/v3/api-docs/**",

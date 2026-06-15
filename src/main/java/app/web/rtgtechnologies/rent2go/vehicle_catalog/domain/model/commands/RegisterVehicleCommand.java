@@ -1,6 +1,7 @@
 package app.web.rtgtechnologies.rent2go.vehicle_catalog.domain.model.commands;
 
 import java.math.BigDecimal;
+import java.util.List;
 
 /**
  * RegisterVehicleCommand
@@ -22,6 +23,10 @@ public record RegisterVehicleCommand(
     String description,
     Integer seats,
     String transmission,
-    String fuelType
+    String fuelType,
+    String primaryImageUrl,
+    List<String> featureNames,
+    BigDecimal latitude,
+    BigDecimal longitude
 ) {
 }

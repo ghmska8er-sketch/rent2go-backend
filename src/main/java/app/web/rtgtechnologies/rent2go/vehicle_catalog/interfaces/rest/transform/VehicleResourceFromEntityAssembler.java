@@ -38,6 +38,8 @@ public final class VehicleResourceFromEntityAssembler {
             .seats(entity.getSeats())
             .transmission(entity.getTransmission())
             .fuelType(entity.getFuelType())
+            .latitude(entity.getLatitude())
+            .longitude(entity.getLongitude())
             .features(entity.getFeatures().stream().map(feature -> feature.getName()).toList())
             .primaryImageUrl(entity.getPrimaryImageUrl())
             .primaryImagePath(entity.getPrimaryImagePath())

@@ -2,8 +2,10 @@ package app.web.rtgtechnologies.rent2go.vehicle_catalog.application.internal.com
 
 import app.web.rtgtechnologies.rent2go.vehicle_catalog.domain.model.aggregates.Vehicle;
 import app.web.rtgtechnologies.rent2go.vehicle_catalog.domain.model.aggregates.VehicleCategory;
+import app.web.rtgtechnologies.rent2go.vehicle_catalog.domain.model.aggregates.VehicleFeature;
 import app.web.rtgtechnologies.rent2go.vehicle_catalog.domain.model.aggregates.VehicleImage;
 import app.web.rtgtechnologies.rent2go.vehicle_catalog.domain.model.commands.RegisterVehicleCommand;
+import app.web.rtgtechnologies.rent2go.vehicle_catalog.domain.model.commands.RegisterVehicleWithImageCommand;
 import app.web.rtgtechnologies.rent2go.vehicle_catalog.domain.model.commands.SetPrimaryVehicleImageCommand;
 import app.web.rtgtechnologies.rent2go.vehicle_catalog.domain.model.commands.RemoveVehicleImageCommand;
 import app.web.rtgtechnologies.rent2go.vehicle_catalog.domain.model.commands.UpdateVehicleDetailsCommand;
@@ -12,6 +14,7 @@ import app.web.rtgtechnologies.rent2go.vehicle_catalog.domain.model.commands.Upl
 import app.web.rtgtechnologies.rent2go.vehicle_catalog.domain.model.services.VehicleCommandService;
 import app.web.rtgtechnologies.rent2go.vehicle_catalog.domain.model.valueobjects.VehicleStatus;
 import app.web.rtgtechnologies.rent2go.vehicle_catalog.infrastructure.persistence.jpa.repositories.VehicleCategoryRepository;
+import app.web.rtgtechnologies.rent2go.vehicle_catalog.infrastructure.persistence.jpa.repositories.VehicleFeatureRepository;
 import app.web.rtgtechnologies.rent2go.vehicle_catalog.infrastructure.persistence.jpa.repositories.VehicleRepository;
 import lombok.AllArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -37,6 +40,7 @@ public class VehicleCommandServiceImpl implements VehicleCommandService {
 
     private final VehicleRepository vehicleRepository;
     private final VehicleCategoryRepository vehicleCategoryRepository;
+    private final VehicleFeatureRepository vehicleFeatureRepository;
 
     /**
      * Handle RegisterVehicleCommand
@@ -90,7 +94,34 @@ public class VehicleCommandServiceImpl implements VehicleCommandService {
             .seats(command.seats())
             .transmission(command.transmission())
             .fuelType(command.fuelType())
+            .latitude(command.latitude())
+            .longitude(command.longitude())
             .build();
+
+        // Persist features: search existing or create new ones
+        if (command.featureNames() != null && !command.featureNames().isEmpty()) {
+            for (String featureName : command.featureNames()) {
+                VehicleFeature feature = vehicleFeatureRepository.findByName(featureName)
+                    .orElseGet(() -> {
+                        VehicleFeature newFeature = VehicleFeature.builder()
+                            .name(featureName)
+                            .build();
+                        return vehicleFeatureRepository.save(newFeature);
+                    });
+                vehicle.addFeature(feature);
+            }
+        }
+
+        // Persist primary image in vehicle_images table if primaryImageUrl is provided
+        if (command.primaryImageUrl() != null && !command.primaryImageUrl().isBlank()) {
+            VehicleImage image = VehicleImage.builder()
+                .imagePath("")
+                .imageUrl(command.primaryImageUrl())
+                .isPrimary(true)
+                .uploadDate(LocalDateTime.now())
+                .build();
+            vehicle.addImage(image);
+        }
 
         // Persist and return domain aggregate (not DTO)
         return vehicleRepository.save(vehicle);
@@ -140,8 +171,15 @@ public class VehicleCommandServiceImpl implements VehicleCommandService {
             command.description(),
             command.seats(),
             command.transmission(),
-            command.fuelType()
+            command.fuelType(),
+            command.latitude(),
+            command.longitude()
         );
+
+        // Replace features: remove all, then add only the ones in the command
+        if (command.featureNames() != null) {
+            vehicle.updateFeatures(command.featureNames(), vehicleFeatureRepository);
+        }
 
         return vehicleRepository.save(vehicle);
     }
@@ -220,6 +258,77 @@ public class VehicleCommandServiceImpl implements VehicleCommandService {
             ));
 
         vehicle.setPrimaryImage(command.imageId());
+        return vehicleRepository.save(vehicle);
+    }
+
+    /**
+     * Handle RegisterVehicleWithImageCommand
+     *
+     * Creates and persists a new vehicle with a primary image URL.
+     *
+     * @param command RegisterVehicleWithImageCommand with vehicle details and primary image URL
+     * @return Created Vehicle aggregate with primary image
+     * @throws IllegalArgumentException if duplicate license plate or VIN
+     * @throws IllegalArgumentException if category not found
+     */
+    @Override
+    public Vehicle handle(RegisterVehicleWithImageCommand command) {
+        // Validate vehicle doesn't already exist
+        if (vehicleRepository.findByLicensePlate(command.licensePlate()).isPresent()) {
+            throw new IllegalArgumentException(
+                "Vehicle with license plate already exists: " + command.licensePlate()
+            );
+        }
+
+        if (vehicleRepository.findByVin(command.vin()).isPresent()) {
+            throw new IllegalArgumentException(
+                "Vehicle with VIN already exists: " + command.vin()
+            );
+        }
+
+        // Fetch category
+        VehicleCategory category = vehicleCategoryRepository.findById(command.categoryId())
+            .orElseThrow(() -> {
+                var allCategories = vehicleCategoryRepository.findAll();
+                var categoryIds = allCategories.stream()
+                    .map(cat -> cat.getId() + " (" + cat.getName() + ")")
+                    .toList();
+                var message = "Category not found: " + command.categoryId() + ". Available categories: " + categoryIds;
+                return new IllegalArgumentException(message);
+            });
+
+        // Create vehicle aggregate
+        Vehicle vehicle = Vehicle.builder()
+            .ownerId(command.ownerId())
+            .licensePlate(command.licensePlate())
+            .make(command.make())
+            .model(command.model())
+            .year(command.year())
+            .vin(command.vin())
+            .status(VehicleStatus.AVAILABLE)
+            .dailyPrice(command.dailyPrice())
+            .category(category)
+            .location(command.location())
+            .description(command.description())
+            .seats(command.seats())
+            .transmission(command.transmission())
+            .fuelType(command.fuelType())
+            .latitude(command.latitude())
+            .longitude(command.longitude())
+            .build();
+
+        // Persist image in vehicle_images table if imageUrl is provided
+        if (command.imageUrl() != null && !command.imageUrl().isBlank()) {
+            VehicleImage image = VehicleImage.builder()
+                .imagePath("")
+                .imageUrl(command.imageUrl())
+                .isPrimary(true)
+                .uploadDate(LocalDateTime.now())
+                .build();
+            vehicle.addImage(image);
+        }
+
+        // Persist and return domain aggregate (not DTO)
         return vehicleRepository.save(vehicle);
     }
 }

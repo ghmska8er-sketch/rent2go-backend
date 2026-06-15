@@ -10,12 +10,14 @@ import app.web.rtgtechnologies.rent2go.vehicle_catalog.domain.model.services.Veh
 import app.web.rtgtechnologies.rent2go.vehicle_catalog.domain.model.services.VehicleQueryService;
 import app.web.rtgtechnologies.rent2go.vehicle_catalog.domain.model.valueobjects.SearchCriteria;
 import app.web.rtgtechnologies.rent2go.vehicle_catalog.interfaces.rest.resources.CreateVehicleResource;
+import app.web.rtgtechnologies.rent2go.vehicle_catalog.interfaces.rest.resources.RegisterVehicleWithImageResource;
 import app.web.rtgtechnologies.rent2go.vehicle_catalog.interfaces.rest.resources.UpdateVehicleDetailsResource;
 import app.web.rtgtechnologies.rent2go.vehicle_catalog.interfaces.rest.resources.UpdateVehiclePricingResource;
 import app.web.rtgtechnologies.rent2go.vehicle_catalog.interfaces.rest.resources.UploadVehicleImageResource;
 import app.web.rtgtechnologies.rent2go.vehicle_catalog.interfaces.rest.resources.VehicleImageResource;
 import app.web.rtgtechnologies.rent2go.vehicle_catalog.interfaces.rest.resources.VehicleResource;
 import app.web.rtgtechnologies.rent2go.vehicle_catalog.interfaces.rest.transform.CreateVehicleCommandFromResourceAssembler;
+import app.web.rtgtechnologies.rent2go.vehicle_catalog.interfaces.rest.transform.RegisterVehicleWithImageCommandFromResourceAssembler;
 import app.web.rtgtechnologies.rent2go.vehicle_catalog.interfaces.rest.transform.UpdateVehicleDetailsCommandFromResourceAssembler;
 import app.web.rtgtechnologies.rent2go.vehicle_catalog.interfaces.rest.transform.UpdateVehiclePricingCommandFromResourceAssembler;
 import app.web.rtgtechnologies.rent2go.vehicle_catalog.interfaces.rest.transform.UploadVehicleImageCommandFromResourceAssembler;
@@ -24,6 +26,7 @@ import app.web.rtgtechnologies.rent2go.vehicle_catalog.interfaces.rest.transform
 import app.web.rtgtechnologies.rent2go.shared.infrastructure.cloudinary.CloudinaryStorageService;
 import app.web.rtgtechnologies.rent2go.iam.infrastructure.services.JwtTokenProvider;
 import app.web.rtgtechnologies.rent2go.shared.interfaces.rest.resource.PagedResponse;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -91,6 +94,43 @@ public class VehicleController {
     }
 
     /**
+     * POST /api/v1/vehicles/with-image
+     *
+     * Register a new vehicle with a primary image file upload.
+     * The image file is uploaded to Cloudinary and the returned URL is set as the primary image.
+     * This endpoint accepts multipart/form-data with a vehicle JSON body and an image file.
+     */
+    @PostMapping(path = "/with-image", consumes = {"multipart/form-data"})
+    @PreAuthorize("hasRole('USER')")
+    @Operation(summary = "Publish a new vehicle with a primary image file upload")
+    public ResponseEntity<VehicleResource> registerVehicleWithImageFile(
+        @RequestHeader(value = "Authorization", required = false) String authHeader,
+        @RequestPart("vehicle") String vehicleJson,
+        @RequestPart("file") org.springframework.web.multipart.MultipartFile file
+    ) throws java.io.IOException {
+
+        Long ownerId = extractUserIdFromAuthHeader(authHeader);
+
+        // Parse JSON to resource manually to avoid Content-Type issues
+        ObjectMapper mapper = new ObjectMapper();
+        RegisterVehicleWithImageResource vehicleResource = mapper.readValue(vehicleJson, RegisterVehicleWithImageResource.class);
+
+        // Upload image to Cloudinary
+        String imageUrl = cloudinaryStorageService.upload(file);
+
+        // Convert resource to command using assembler
+        var command = RegisterVehicleWithImageCommandFromResourceAssembler.toCommand(ownerId, vehicleResource, imageUrl);
+
+        // Execute command
+        Vehicle vehicle = vehicleCommandService.handle(command);
+
+        // Convert entity to resource using assembler
+        VehicleResource response = VehicleResourceFromEntityAssembler.toResource(vehicle);
+
+        return ResponseEntity.status(HttpStatus.CREATED).body(response);
+    }
+
+    /**
      * GET /api/v1/vehicles/me
      *
      * Retrieve vehicles published by the authenticated owner.
@@ -142,6 +182,10 @@ public class VehicleController {
         @RequestParam(required = false) String transmission,
         @RequestParam(required = false) String fuelType,
         @RequestParam(required = false) String location,
+        @RequestParam(required = false) Double centerLatitude,
+        @RequestParam(required = false) Double centerLongitude,
+        @RequestParam(required = false) Double radiusKm,
+        @RequestParam(required = false) String featureName,
         @RequestParam(defaultValue = "0") @Min(value = 0, message = "Page must be greater than or equal to 0") int page,
         @RequestParam(defaultValue = "20") @Min(value = 1, message = "Size must be greater than 0") @Max(value = 100, message = "Size must be at most 100") int size
     ) {
@@ -154,7 +198,11 @@ public class VehicleController {
             seats,
             transmission,
             fuelType,
-            location
+            location,
+            centerLatitude,
+            centerLongitude,
+            radiusKm,
+            featureName
         );
 
         List<Vehicle> vehicles = vehicleQueryService.handle(new SearchVehiclesByCriteriaQuery(criteria));
@@ -340,6 +388,25 @@ public class VehicleController {
     ) {
         List<VehicleImage> images = vehicleQueryService.handle(new GetVehicleImagesQuery(id));
         return ResponseEntity.ok(toPagedResponse(images, page, size, VehicleImageResourceFromEntityAssembler::toResource));
+    }
+
+    /**
+     * DELETE /api/v1/vehicles/{id}/images/{imageId}
+     *
+     * Remove an image from a vehicle.
+     * If the removed image is the primary, the next image in order becomes primary.
+     */
+    @DeleteMapping("/{id}/images/{imageId}")
+    @PreAuthorize("hasRole('USER')")
+    @Operation(summary = "Remove an image from a vehicle")
+    public ResponseEntity<VehicleResource> removeVehicleImage(
+        @PathVariable Long id,
+        @PathVariable Long imageId
+    ) {
+        var command = new app.web.rtgtechnologies.rent2go.vehicle_catalog.domain.model.commands.RemoveVehicleImageCommand(id, imageId);
+        Vehicle vehicle = vehicleCommandService.handle(command);
+        VehicleResource response = VehicleResourceFromEntityAssembler.toResource(vehicle);
+        return ResponseEntity.ok(response);
     }
 
     private Long extractUserIdFromAuthHeader(String authHeader) {

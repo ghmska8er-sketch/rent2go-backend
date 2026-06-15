@@ -13,7 +13,7 @@ public final class UploadVehicleImageCommandFromResourceAssembler {
     public static UploadVehicleImageCommand toCommand(Long vehicleId, UploadVehicleImageResource resource) {
         return new UploadVehicleImageCommand(
             vehicleId,
-            resource.getImagePath(),
+            resource.getImagePath() == null ? "" : resource.getImagePath(),
             resource.getImageUrl(),
             resource.getIsPrimary()
         );

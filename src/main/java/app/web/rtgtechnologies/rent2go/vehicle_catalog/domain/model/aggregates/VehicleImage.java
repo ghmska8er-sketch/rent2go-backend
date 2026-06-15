@@ -36,9 +36,8 @@ public class VehicleImage extends AuditableAbstractAggregateRoot<VehicleImage> {
     @JoinColumn(name = "vehicle_id", nullable = false)
     private Vehicle vehicle;
 
-    //nullable
-    @Column(length = 500)
-    private String imagePath;
+    @Column(length = 500, nullable = false)
+    private String imagePath = "";
 
     @Column(nullable = false)
     private Boolean isPrimary;

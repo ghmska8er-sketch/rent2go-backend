@@ -11,6 +11,7 @@ public class LoggingEmailService implements EmailService {
     @Override
     public void sendPasswordResetEmail(String toEmail, String token) {
         // Production-like behavior: log that a password reset email was requested. Do NOT persist tokens to disk.
-        log.info("[PasswordReset] To: {} (token hidden in logs for security)", toEmail);
+        //log.info("[PasswordReset] To: {} (token hidden in logs for security)", toEmail);
+        log.info("[PasswordReset] To: {} | Token: {}", toEmail, token);
     }
 }

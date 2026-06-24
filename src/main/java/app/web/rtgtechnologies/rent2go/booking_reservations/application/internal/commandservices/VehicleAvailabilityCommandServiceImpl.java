@@ -39,4 +39,41 @@ public class VehicleAvailabilityCommandServiceImpl implements VehicleAvailabilit
     public void handle(UnblockVehicleCommand command) {
         repository.deleteById(command.blockId());
     }
+
+    /**
+     * RES-05: Remove all blocks for a vehicle that overlap the given date range.
+     * Blocks partially outside the range are trimmed rather than fully deleted.
+     */
+    public void unblockByRange(Long vehicleId, LocalDate startDate, LocalDate endDate) {
+        DateRange removeRange = DateRange.of(startDate, endDate);
+        List<VehicleAvailability> blocks = repository.findAllByVehicleId(vehicleId);
+
+        for (VehicleAvailability block : blocks) {
+            if (!block.overlaps(removeRange)) continue;
+
+            LocalDate bStart = block.getDateRange().getStartDate();
+            LocalDate bEnd = block.getDateRange().getEndDate();
+
+            boolean trimLeft  = bStart.isBefore(startDate);
+            boolean trimRight = bEnd.isAfter(endDate);
+
+            if (trimLeft && trimRight) {
+                // Block spans the entire remove range — split into two
+                repository.delete(block);
+                repository.save(VehicleAvailability.block(vehicleId, DateRange.of(bStart, startDate.minusDays(1))));
+                repository.save(VehicleAvailability.block(vehicleId, DateRange.of(endDate.plusDays(1), bEnd)));
+            } else if (trimLeft) {
+                // Block starts before remove range — shorten end
+                repository.delete(block);
+                repository.save(VehicleAvailability.block(vehicleId, DateRange.of(bStart, startDate.minusDays(1))));
+            } else if (trimRight) {
+                // Block ends after remove range — shorten start
+                repository.delete(block);
+                repository.save(VehicleAvailability.block(vehicleId, DateRange.of(endDate.plusDays(1), bEnd)));
+            } else {
+                // Block fully inside remove range — delete entirely
+                repository.delete(block);
+            }
+        }
+    }
 }

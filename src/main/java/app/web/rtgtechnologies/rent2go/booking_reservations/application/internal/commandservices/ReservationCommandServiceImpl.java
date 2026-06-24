@@ -8,8 +8,9 @@ import app.web.rtgtechnologies.rent2go.booking_reservations.infrastructure.persi
 import app.web.rtgtechnologies.rent2go.booking_reservations.domain.model.commands.ModifyReservationCommand;
 import app.web.rtgtechnologies.rent2go.booking_reservations.domain.model.services.VehicleAvailabilityQueryService;
 import app.web.rtgtechnologies.rent2go.booking_reservations.domain.model.commands.UpdateReservationStatusCommand;
-import app.web.rtgtechnologies.rent2go.booking_reservations.domain.model.valueobjects.BookingStatus;
 import app.web.rtgtechnologies.rent2go.booking_reservations.domain.model.services.NotificationService;
+import app.web.rtgtechnologies.rent2go.vehicle_catalog.infrastructure.persistence.jpa.repositories.VehicleRepository;
+import app.web.rtgtechnologies.rent2go.community_trust.infrastructure.persistence.jpa.repositories.UserReputationRepository;
 import lombok.AllArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -27,14 +28,42 @@ public class ReservationCommandServiceImpl implements ReservationCommandService 
     private final ReservationRepository reservationRepository;
     private final VehicleAvailabilityQueryService availabilityQueryService;
     private final NotificationService notificationService;
+    private final VehicleRepository vehicleRepository;
+    private final UserReputationRepository userReputationRepository;
 
     @Override
     public Reservation handle(CreateReservationCommand command) {
+        // RES-01: resolve ownerId from vehicle instead of requiring it in the payload
+        var vehicle = vehicleRepository.findById(command.vehicleId())
+            .orElseThrow(() -> new IllegalArgumentException("Vehicle not found: " + command.vehicleId()));
+        Long ownerId = vehicle.getOwnerId();
+
+        // RES-08: reject if renter is globally blocked in the community trust context
+        userReputationRepository.findByUserId(command.renterId()).ifPresent(rep -> {
+            if (rep.isBlocked()) {
+                throw new IllegalStateException("El arrendatario tiene acceso bloqueado a la plataforma.");
+            }
+        });
+
+        DateRange requestedRange = DateRange.of(command.startDate(), command.endDate());
+
+        // RES-02: validate no overlapping confirmed/active/pending reservation exists for this vehicle
+        var existingReservations = reservationRepository.findAllByVehicleId(command.vehicleId());
+        for (var existing : existingReservations) {
+            var status = existing.getStatus().getStatus();
+            if ("CONFIRMED".equals(status) || "ACTIVE".equals(status) || "PENDING".equals(status)) {
+                if (existing.getDateRange().overlaps(requestedRange)) {
+                    throw new IllegalStateException(
+                        "El vehículo ya tiene una reserva para las fechas solicitadas.");
+                }
+            }
+        }
+
         Reservation reservation = Reservation.create(
             command.vehicleId(),
             command.renterId(),
-            command.ownerId(),
-            DateRange.of(command.startDate(), command.endDate()),
+            ownerId,
+            requestedRange,
             command.totalAmount()
         );
 

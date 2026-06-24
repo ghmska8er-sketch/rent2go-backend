@@ -3,6 +3,7 @@ package app.web.rtgtechnologies.rent2go.payments.interfaces.rest.resources;
 public class EarningsReportResource {
     private Long ownerId;
     private Long totalAmountCents;
+    private java.math.BigDecimal totalAmount;
     private Long availablePayoutCents;
     private Long pendingPayoutCents;
     private String currency;
@@ -16,6 +17,8 @@ public class EarningsReportResource {
     public void setOwnerId(Long ownerId) { this.ownerId = ownerId; }
     public Long getTotalAmountCents() { return totalAmountCents; }
     public void setTotalAmountCents(Long totalAmountCents) { this.totalAmountCents = totalAmountCents; }
+    public java.math.BigDecimal getTotalAmount() { return totalAmount; }
+    public void setTotalAmount(java.math.BigDecimal totalAmount) { this.totalAmount = totalAmount; }
     public Long getAvailablePayoutCents() { return availablePayoutCents; }
     public void setAvailablePayoutCents(Long availablePayoutCents) { this.availablePayoutCents = availablePayoutCents; }
     public Long getPendingPayoutCents() { return pendingPayoutCents; }

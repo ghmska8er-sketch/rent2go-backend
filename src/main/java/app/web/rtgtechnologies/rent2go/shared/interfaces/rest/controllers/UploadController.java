@@ -5,6 +5,7 @@ import app.web.rtgtechnologies.rent2go.shared.interfaces.rest.resources.ImageUpl
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestPart;
@@ -25,6 +26,7 @@ public class UploadController {
     }
 
     @PostMapping(path = "/images", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @PreAuthorize("hasRole('USER')")
     public ResponseEntity<ImageUploadResponse> uploadImage(@RequestPart("file") MultipartFile file) throws IOException {
         String url = storageService.upload(file);
         ImageUploadResponse resp = new ImageUploadResponse(url, null);

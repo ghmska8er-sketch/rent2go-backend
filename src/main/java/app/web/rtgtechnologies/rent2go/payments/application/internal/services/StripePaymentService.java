@@ -11,10 +11,13 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import app.web.rtgtechnologies.rent2go.booking_reservations.infrastructure.persistence.jpa.repositories.ReservationRepository;
+import app.web.rtgtechnologies.rent2go.booking_reservations.infrastructure.persistence.jpa.repositories.VehicleAvailabilityRepository;
+import app.web.rtgtechnologies.rent2go.booking_reservations.domain.model.aggregates.VehicleAvailability;
+import app.web.rtgtechnologies.rent2go.booking_reservations.domain.model.valueobjects.DateRange;
 
 import java.util.Optional;
-
 import java.util.HashMap;
 import java.util.Map;
 
@@ -30,13 +33,13 @@ public class StripePaymentService {
     private String stripeWebhookSecret;
 
     private final ReservationRepository reservationRepository;
+    private final VehicleAvailabilityRepository availabilityRepository;
 
-    // Inject PaymentsService to update payment records
-    private final app.web.rtgtechnologies.rent2go.payments.application.internal.services.PaymentsService paymentsService;
-
-    public StripePaymentService(ReservationRepository reservationRepository, app.web.rtgtechnologies.rent2go.payments.application.internal.services.PaymentsService paymentsService) {
+    public StripePaymentService(
+            ReservationRepository reservationRepository,
+            VehicleAvailabilityRepository availabilityRepository) {
         this.reservationRepository = reservationRepository;
-        this.paymentsService = paymentsService;
+        this.availabilityRepository = availabilityRepository;
     }
 
     public Map<String, Object> createPaymentIntent(Long reservationId, Long amountCents, String currency) throws StripeException {
@@ -59,6 +62,7 @@ public class StripePaymentService {
         return Webhook.constructEvent(payload, sigHeader, stripeWebhookSecret);
     }
 
+    @Transactional
     public void handleWebhookEvent(Event event) {
         log.info("Received Stripe event: {}", event.getType());
         switch (event.getType()) {
@@ -66,27 +70,72 @@ public class StripePaymentService {
                 PaymentIntent intent = (PaymentIntent) event.getDataObjectDeserializer().getObject().orElse(null);
                 if (intent != null) {
                     log.info("PaymentIntent succeeded: {} metadata: {}", intent.getId(), intent.getMetadata());
-                    try {
-                        String reservationIdStr = intent.getMetadata().get("reservationId");
-                        if (reservationIdStr != null && !reservationIdStr.isBlank()) {
-                            Long reservationId = Long.valueOf(reservationIdStr);
-                            Optional<app.web.rtgtechnologies.rent2go.booking_reservations.domain.model.aggregates.Reservation> resOpt = reservationRepository.findById(reservationId);
-                            if (resOpt.isPresent()) {
-                                var reservation = resOpt.get();
-                                reservation.markPaid(intent.getId());
-                                reservationRepository.save(reservation);
-                                log.info("Reservation {} marked as paid (intent={})", reservationId, intent.getId());
-                            } else {
-                                log.warn("Reservation metadata points to non-existent id: {}", reservationId);
-                            }
-                        }
-                    } catch (Exception ex) {
-                        log.error("Error handling payment_intent.succeeded webhook: {}", ex.getMessage(), ex);
-                    }
+                    handlePaymentSucceeded(intent);
                 }
             }
             case "charge.refunded" -> log.info("Charge refunded event received: {}", event.getData());
             default -> log.info("Unhandled event type: {}", event.getType());
+        }
+    }
+
+    private void handlePaymentSucceeded(PaymentIntent intent) {
+        try {
+            String reservationIdStr = intent.getMetadata().get("reservationId");
+            if (reservationIdStr == null || reservationIdStr.isBlank()) {
+                log.warn("payment_intent.succeeded received without reservationId in metadata (intentId={})", intent.getId());
+                return;
+            }
+
+            Long reservationId = Long.valueOf(reservationIdStr);
+            Optional<app.web.rtgtechnologies.rent2go.booking_reservations.domain.model.aggregates.Reservation> resOpt =
+                    reservationRepository.findById(reservationId);
+
+            if (resOpt.isEmpty()) {
+                log.warn("Reservation metadata points to non-existent id: {}", reservationId);
+                return;
+            }
+
+            var reservation = resOpt.get();
+
+            // Mark paid + auto-confirm if PENDING (markPaid already calls confirm() internally)
+            if (!reservation.getStatus().isConfirmed() && !reservation.getStatus().isTerminal()) {
+                reservation.markPaid(intent.getId());
+            } else if (reservation.getStatus().isConfirmed()) {
+                // Already confirmed — just record the paymentIntentId if not set
+                log.info("Reservation {} already confirmed, skipping re-confirm", reservationId);
+            }
+
+            reservationRepository.save(reservation);
+            log.info("Reservation {} confirmed and paid (intent={})", reservationId, intent.getId());
+
+            // Auto-block vehicle availability for reservation dates
+            blockVehicleDatesForReservation(reservation);
+
+        } catch (Exception ex) {
+            log.error("Error handling payment_intent.succeeded webhook: {}", ex.getMessage(), ex);
+        }
+    }
+
+    private void blockVehicleDatesForReservation(
+            app.web.rtgtechnologies.rent2go.booking_reservations.domain.model.aggregates.Reservation reservation) {
+        try {
+            Long vehicleId = reservation.getVehicleId();
+            DateRange range = reservation.getDateRange();
+
+            // Check if a block for this reservation already exists to ensure idempotency
+            boolean alreadyBlocked = availabilityRepository.findAllByVehicleId(vehicleId).stream()
+                    .anyMatch(b -> b.overlaps(range));
+
+            if (!alreadyBlocked) {
+                VehicleAvailability block = VehicleAvailability.block(vehicleId, range);
+                availabilityRepository.save(block);
+                log.info("Blocked vehicle {} from {} to {} after payment confirmed",
+                        vehicleId, range.getStartDate(), range.getEndDate());
+            } else {
+                log.info("Vehicle {} already has an overlapping block for reservation dates — skipping", vehicleId);
+            }
+        } catch (Exception ex) {
+            log.warn("Could not auto-block vehicle availability after payment: {}", ex.getMessage());
         }
     }
 

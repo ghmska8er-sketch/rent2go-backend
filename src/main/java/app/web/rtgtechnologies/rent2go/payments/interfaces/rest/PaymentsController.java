@@ -51,16 +51,63 @@ public class PaymentsController {
     @Value("${stripe.webhook-secret:}")
     private String stripeWebhookSecret;
 
+    @GetMapping("/coverage-plans")
+    @Operation(summary = "List coverage plans",
+               description = "Returns all available coverage plans with their codes, descriptions, and daily rates. " +
+                             "Pass the plan's `code` as the `coveragePlan` field when calculating a fare or creating a reservation.")
+    public ResponseEntity<java.util.List<java.util.Map<String, Object>>> getCoveragePlans() {
+        var plans = java.util.List.of(
+            coveragePlan("BASIC", "Basic Coverage",
+                "Covers liability and minor damage. Deductible: $500.", BigDecimal.valueOf(5.00)),
+            coveragePlan("STANDARD", "Standard Coverage",
+                "Covers liability, collision, and theft with a $250 deductible.", BigDecimal.valueOf(12.00)),
+            coveragePlan("PREMIUM", "Premium Coverage",
+                "Full coverage with zero deductible, including roadside assistance.", BigDecimal.valueOf(20.00)),
+            coveragePlan("NONE", "No Coverage",
+                "No additional coverage. Renter assumes all liability.", BigDecimal.ZERO)
+        );
+        return ResponseEntity.ok(plans);
+    }
+
+    private java.util.Map<String, Object> coveragePlan(String code, String name, String description, BigDecimal dailyRate) {
+        java.util.Map<String, Object> m = new java.util.LinkedHashMap<>();
+        m.put("code", code);
+        m.put("name", name);
+        m.put("description", description);
+        m.put("dailyRateUSD", dailyRate);
+        return m;
+    }
+
     @PostMapping("/calculate")
-    @Operation(summary = "Calculate fare", description = "Calculates the trip total by applying fees, discounts and promo codes.")
+    @Operation(summary = "Calculate fare", description = "Calculates the trip total by applying fees, discounts and promo codes. " +
+               "Use the `coveragePlan` field with a code from GET /coverage-plans (BASIC, STANDARD, PREMIUM, or NONE).")
     public ResponseEntity<MoneyResource> calculateFare(@Valid @RequestBody CalculateFareRequest request) {
         Money base = Money.of(request.getBaseAmount(), request.getCurrency());
 
         BigDecimal subtotal = request.getBaseAmount();
 
-        List<Fee> fees = request.getFees() == null ? List.of() : request.getFees().stream()
+        List<Fee> fees = new java.util.ArrayList<>(
+            request.getFees() == null ? List.of() : request.getFees().stream()
                 .map(f -> Fee.of(f.getCode(), f.getAmount()))
-                .collect(Collectors.toList());
+                .collect(Collectors.toList()));
+
+        // Auto-inject coverage fee from plan code if provided and no coverage fee already present
+        if (request.getCoveragePlan() != null && !request.getCoveragePlan().isBlank()
+                && !"NONE".equalsIgnoreCase(request.getCoveragePlan())) {
+            boolean hasCoverage = fees.stream().anyMatch(f -> f.getCode() != null
+                    && (f.getCode().toLowerCase().contains("coverage") || f.getCode().toLowerCase().contains("insurance")));
+            if (!hasCoverage) {
+                BigDecimal rate = switch (request.getCoveragePlan().toUpperCase()) {
+                    case "BASIC"    -> BigDecimal.valueOf(5.00);
+                    case "STANDARD" -> BigDecimal.valueOf(12.00);
+                    case "PREMIUM"  -> BigDecimal.valueOf(20.00);
+                    default         -> BigDecimal.ZERO;
+                };
+                if (rate.compareTo(BigDecimal.ZERO) > 0) {
+                    fees.add(Fee.of("coverage_" + request.getCoveragePlan().toLowerCase(), rate));
+                }
+            }
+        }
 
         List<Discount> discounts = request.getDiscounts() == null ? List.of() : request.getDiscounts().stream()
             .map(d -> Discount.of(d.getCode(), d.getPercentage()))
@@ -199,12 +246,13 @@ public class PaymentsController {
             resource.setFrom(from);
             resource.setTo(to);
             resource.setCurrency("USD");
-            resource.setTotalAmountCents(totalCents != null ? totalCents : 0L);
-            resource.setAvailablePayoutCents(totalCents != null ? totalCents : 0L);
+            long cents = totalCents != null ? totalCents : 0L;
+            resource.setTotalAmountCents(cents);
+            resource.setTotalAmount(BigDecimal.valueOf(cents).divide(BigDecimal.valueOf(100), 2, java.math.RoundingMode.HALF_UP));
+            resource.setAvailablePayoutCents(cents);
             resource.setPendingPayoutCents(0L);
             resource.setPaymentsCount(paymentCount != null ? paymentCount : 0L);
-            // Provide UI-friendly fields
-            resource.setAvailableNowCents(resource.getAvailablePayoutCents());
+            resource.setAvailableNowCents(cents);
             resource.setNextPayoutDate(java.time.LocalDate.now().plusDays(7).toString());
             return ResponseEntity.ok(resource);
         } catch (DateTimeParseException ex) {

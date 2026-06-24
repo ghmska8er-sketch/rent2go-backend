@@ -13,6 +13,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.net.URI;
@@ -28,6 +29,7 @@ public class NotificationsController {
     private final DeviceTokenQueryServiceImpl queryService;
 
     @PostMapping("/device-tokens")
+    @PreAuthorize("hasRole('USER')")
     @Operation(summary = "Register device token", description = "Stores or refreshes a push notification token for a user's device.")
     public ResponseEntity<DeviceTokenResource> registerDeviceToken(@Valid @RequestBody RegisterDeviceTokenResource resource) {
         var command = RegisterDeviceTokenCommandFromResourceAssembler.toCommand(resource);
@@ -37,6 +39,7 @@ public class NotificationsController {
     }
 
     @GetMapping("/users/{userId}/device-tokens")
+    @PreAuthorize("hasRole('USER')")
     @Operation(summary = "List device tokens", description = "Returns all device tokens registered for a user.")
     public ResponseEntity<List<DeviceTokenResource>> getDeviceTokensByUser(@PathVariable Long userId) {
         var results = queryService.handle(new GetDeviceTokensByUserQuery(userId));
@@ -44,6 +47,7 @@ public class NotificationsController {
     }
 
     @DeleteMapping("/users/{userId}/device-tokens/{deviceTokenId}")
+    @PreAuthorize("hasRole('USER')")
     @Operation(summary = "Unregister device token", description = "Deletes a previously registered device token for the specified user.")
     public ResponseEntity<Void> unregisterDeviceToken(@PathVariable Long userId, @PathVariable Long deviceTokenId) {
         var deleted = commandService.handle(new UnregisterDeviceTokenCommand(deviceTokenId, userId));

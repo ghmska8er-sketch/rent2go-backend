@@ -20,10 +20,15 @@ public class UnauthorizedRequestHandlerEntryPoint implements AuthenticationEntry
     public void commence(HttpServletRequest request, HttpServletResponse response, AuthenticationException authException) throws IOException, ServletException {
         String original = (String) request.getAttribute("javax.servlet.error.request_uri");
         String path = original != null ? original : request.getRequestURI();
-        LOGGER.warn("Unauthorized access to {} - reason: {}", path, authException == null ? "unknown" : authException.getMessage());
+        String reason = authException == null ? "unknown" : authException.getMessage();
+        LOGGER.warn("Unauthorized access to {} - reason: {}", path, reason);
         response.setContentType("application/json;charset=UTF-8");
         response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
-        String body = String.format("{\"error\":\"Unauthorized\",\"path\":\"%s\"}", path);
+        String body = String.format(
+            "{\"error\":\"Unauthorized\",\"message\":\"Authentication is required to access this resource.\",\"reason\":\"%s\",\"path\":\"%s\"}",
+            reason != null ? reason.replace("\"", "'") : "no token provided",
+            path
+        );
         response.getWriter().write(body);
     }
 }

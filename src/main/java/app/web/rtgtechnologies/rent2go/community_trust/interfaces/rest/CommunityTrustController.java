@@ -45,11 +45,13 @@ import app.web.rtgtechnologies.rent2go.community_trust.interfaces.rest.resources
 import app.web.rtgtechnologies.rent2go.community_trust.interfaces.rest.resources.SubmitReviewResource;
 import app.web.rtgtechnologies.rent2go.community_trust.interfaces.rest.resources.UserReputationResource;
 import app.web.rtgtechnologies.rent2go.community_trust.interfaces.rest.resources.VehicleRatingResource;
+import app.web.rtgtechnologies.rent2go.community_trust.infrastructure.persistence.jpa.repositories.UserReputationRepository;
 import jakarta.validation.Valid;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.net.URI;
@@ -65,6 +67,7 @@ public class CommunityTrustController {
     private final ReviewQueryServiceImpl queryService;
     private final ConversationCommandServiceImpl conversationCommandService;
     private final ConversationQueryServiceImpl conversationQueryService;
+    private final UserReputationRepository userReputationRepository;
     private final SubmitReviewCommandFromResourceAssembler submitAssembler;
     private final FlagReviewCommandFromResourceAssembler flagAssembler;
     private final ModerationActionCommandFromResourceAssembler moderationAssembler;
@@ -94,7 +97,8 @@ public class CommunityTrustController {
     }
 
     @PostMapping("/reviews/{reviewId}/approve")
-    @Operation(summary = "Approve review", description = "Marks a flagged review as approved by moderation.")
+    @PreAuthorize("hasRole('ADMIN')")
+    @Operation(summary = "[ADMIN ONLY] Approve review", description = "Marks a flagged review as approved by moderation.")
     public ResponseEntity<ReviewResource> approveReview(@PathVariable Long reviewId, @Valid @RequestBody ModerationActionResource resource) {
         ApproveReviewCommand command = moderationAssembler.toApproveCommand(reviewId, resource);
         var saved = commandService.handle(command);
@@ -102,7 +106,8 @@ public class CommunityTrustController {
     }
 
     @PostMapping("/reviews/{reviewId}/reject")
-    @Operation(summary = "Reject review", description = "Marks a review as rejected and records the moderation note.")
+    @PreAuthorize("hasRole('ADMIN')")
+    @Operation(summary = "[ADMIN ONLY] Reject review", description = "Marks a review as rejected and records the moderation note.")
     public ResponseEntity<ReviewResource> rejectReview(@PathVariable Long reviewId, @Valid @RequestBody ModerationActionResource resource) {
         RejectReviewCommand command = moderationAssembler.toRejectCommand(reviewId, resource);
         var saved = commandService.handle(command);
@@ -142,7 +147,8 @@ public class CommunityTrustController {
     }
 
     @GetMapping("/dashboard")
-    @Operation(summary = "Get trust dashboard", description = "Returns the global trust metrics dashboard for administrators.")
+    @PreAuthorize("hasRole('ADMIN')")
+    @Operation(summary = "[ADMIN ONLY] Get trust dashboard", description = "Returns the global trust metrics dashboard for administrators.")
     public ResponseEntity<CommunityTrustDashboardResource> getDashboard() {
         var dashboard = queryService.handle(new GetCommunityTrustDashboardQuery());
         return ResponseEntity.ok(new CommunityTrustDashboardResource(
@@ -173,11 +179,33 @@ public class CommunityTrustController {
     }
 
     @PostMapping("/users/{userId}/block")
-    @Operation(summary = "Block user", description = "Blocks a user and records the moderation reason.")
+    @PreAuthorize("hasRole('ADMIN')")
+    @Operation(summary = "[ADMIN ONLY] Block user", description = "Blocks a user and records the moderation reason.")
     public ResponseEntity<Void> blockUser(@PathVariable Long userId, @Valid @RequestBody BlockUserResource resource) {
         BlockUserForTrustCommand command = blockAssembler.toCommand(userId, resource);
         commandService.handle(command);
         return ResponseEntity.noContent().build();
+    }
+
+    @GetMapping("/users/blocked")
+    @PreAuthorize("hasRole('ADMIN')")
+    @Operation(summary = "[ADMIN ONLY] List blocked users",
+               description = "Returns all users whose trust reputation is marked as blocked, including the moderation reason.")
+    public ResponseEntity<List<UserReputationResource>> getBlockedUsers() {
+        var blocked = userReputationRepository.findAllByBlocked(true).stream()
+            .map(rep -> new UserReputationResource(
+                rep.getUserId(),
+                rep.getApprovedReviewCount(),
+                rep.getAverageRating(),
+                rep.getTrustScore(),
+                rep.isBlocked(),
+                rep.getLastModerationReason(),
+                rep.getCompletedTrips(),
+                rep.getAcceptanceRate(),
+                rep.getResponseRate()
+            ))
+            .toList();
+        return ResponseEntity.ok(blocked);
     }
 
     @PostMapping("/reservations/{reservationId}/disputes")

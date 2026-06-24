@@ -123,10 +123,21 @@ public class VehicleQueryServiceImpl implements VehicleQueryService {
                 .toList();
         }
 
-        // Filter by categories if provided
+        // Filter by categories if provided — accepts category names or numeric IDs as strings
         if (criteria.hasCategories()) {
             results = results.stream()
-                .filter(v -> criteria.getCategories().contains(v.getCategory().getName()))
+                .filter(v -> {
+                    if (v.getCategory() == null) return false;
+                    for (String cat : criteria.getCategories()) {
+                        try {
+                            Long categoryId = Long.parseLong(cat);
+                            if (categoryId.equals(v.getCategory().getId())) return true;
+                        } catch (NumberFormatException ignored) {
+                            if (cat.equalsIgnoreCase(v.getCategory().getName())) return true;
+                        }
+                    }
+                    return false;
+                })
                 .toList();
         }
 

@@ -182,10 +182,9 @@ public class UserCommandServiceImpl implements UserCommandService {
         PasswordResetToken entity = new PasswordResetToken(token, user.getId(), expiresAt, now);
         passwordResetTokenRepository.save(entity);
 
-        // Send email (logged)
         emailService.sendPasswordResetEmail(user.getEmail().getValue(), token);
 
-        return "ok";
+        return token;
     }
 
     @Override

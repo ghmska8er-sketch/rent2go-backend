@@ -6,9 +6,11 @@ import app.web.rtgtechnologies.rent2go.vehicle_catalog.domain.model.queries.GetV
 import app.web.rtgtechnologies.rent2go.vehicle_catalog.domain.model.queries.GetVehicleImagesQuery;
 import app.web.rtgtechnologies.rent2go.vehicle_catalog.domain.model.queries.GetVehiclesByOwnerQuery;
 import app.web.rtgtechnologies.rent2go.vehicle_catalog.domain.model.queries.SearchVehiclesByCriteriaQuery;
+import app.web.rtgtechnologies.rent2go.vehicle_catalog.domain.model.aggregates.VehicleCategory;
 import app.web.rtgtechnologies.rent2go.vehicle_catalog.domain.model.services.VehicleCommandService;
 import app.web.rtgtechnologies.rent2go.vehicle_catalog.domain.model.services.VehicleQueryService;
 import app.web.rtgtechnologies.rent2go.vehicle_catalog.domain.model.valueobjects.SearchCriteria;
+import app.web.rtgtechnologies.rent2go.vehicle_catalog.infrastructure.persistence.jpa.repositories.VehicleCategoryRepository;
 import app.web.rtgtechnologies.rent2go.vehicle_catalog.interfaces.rest.resources.CreateVehicleResource;
 import app.web.rtgtechnologies.rent2go.vehicle_catalog.interfaces.rest.resources.RegisterVehicleWithImageResource;
 import app.web.rtgtechnologies.rent2go.vehicle_catalog.interfaces.rest.resources.UpdateVehicleDetailsResource;
@@ -66,6 +68,29 @@ public class VehicleController {
     private final VehicleQueryService vehicleQueryService;
     private final JwtTokenProvider jwtTokenProvider;
     private final CloudinaryStorageService cloudinaryStorageService;
+    private final VehicleCategoryRepository vehicleCategoryRepository;
+
+    /**
+     * GET /api/v1/vehicles/categories
+     *
+     * List all available vehicle categories so clients know valid filter values.
+     */
+    @GetMapping("/categories")
+    @Operation(summary = "List all vehicle categories")
+    public ResponseEntity<List<java.util.Map<String, Object>>> getCategories() {
+        var categories = vehicleCategoryRepository.findAll();
+        var result = categories.stream()
+            .map(c -> {
+                java.util.Map<String, Object> m = new java.util.LinkedHashMap<>();
+                m.put("id", c.getId());
+                m.put("name", c.getName());
+                m.put("description", c.getDescription());
+                m.put("iconUrl", c.getIconUrl());
+                return m;
+            })
+            .collect(Collectors.toList());
+        return ResponseEntity.ok(result);
+    }
 
     /**
      * POST /api/v1/vehicles

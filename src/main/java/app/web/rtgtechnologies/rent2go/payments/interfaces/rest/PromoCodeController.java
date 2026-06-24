@@ -33,17 +33,23 @@ public class PromoCodeController {
 
     @PostMapping
     @PreAuthorize("hasRole('ADMIN')")
-    @Operation(summary = "Create promo code", description = "Creates a new promo code for the payments module.")
+    @Operation(summary = "Create promo code", description = "Creates a new promo code. Returns 409 if the code already exists.")
     public ResponseEntity<PromoCodeResource> create(@Valid @RequestBody CreatePromoRequest req) {
         LocalDateTime expires = null;
         if (req.getExpiresAt() != null) {
             try { expires = LocalDateTime.parse(req.getExpiresAt()); } catch (DateTimeParseException ex) { return ResponseEntity.badRequest().build(); }
         }
-        PromoCode p = promoService.createPromo(req.getCode(), req.getPercentage(), expires);
-        PromoCodeResource r = new PromoCodeResource();
-        r.setCode(p.getCode()); r.setPercentage(p.getPercentage()); r.setActive(p.isActive());
-        r.setExpiresAt(p.getExpiresAt() == null ? null : p.getExpiresAt().toString());
-        return ResponseEntity.status(201).body(r);
+        try {
+            PromoCode p = promoService.createPromo(req.getCode(), req.getPercentage(), expires);
+            PromoCodeResource r = new PromoCodeResource();
+            r.setCode(p.getCode()); r.setPercentage(p.getPercentage()); r.setActive(p.isActive());
+            r.setExpiresAt(p.getExpiresAt() == null ? null : p.getExpiresAt().toString());
+            return ResponseEntity.status(201).body(r);
+        } catch (org.springframework.dao.DataIntegrityViolationException ex) {
+            return ResponseEntity.status(org.springframework.http.HttpStatus.CONFLICT).build();
+        } catch (IllegalArgumentException ex) {
+            return ResponseEntity.badRequest().build();
+        }
     }
 
     @PatchMapping("/{code}/deactivate")

@@ -91,6 +91,57 @@ public class ReservationController {
         return ResponseEntity.ok(resourceAssembler.toResource(updated));
     }
 
+    @PostMapping("/{id}/confirm")
+    @Operation(summary = "Confirm reservation", description = "Transitions a PENDING reservation to CONFIRMED. Can also be triggered automatically by a successful payment webhook.")
+    public ResponseEntity<ReservationResource> confirmReservation(@PathVariable Long id) {
+        var reservationOpt = queryService.handle(new GetReservationByIdQuery(id));
+        if (reservationOpt.isEmpty()) return ResponseEntity.notFound().build();
+        var resource = new UpdateReservationStatusResource();
+        resource.setActorId(reservationOpt.get().getOwnerId());
+        resource.setStatus("CONFIRMED");
+        var command = updateStatusAssembler.toCommand(id, resource);
+        try {
+            var updated = commandService.handle(command);
+            return ResponseEntity.ok(resourceAssembler.toResource(updated));
+        } catch (IllegalStateException e) {
+            return ResponseEntity.status(org.springframework.http.HttpStatus.CONFLICT).build();
+        }
+    }
+
+    @PostMapping("/{id}/activate")
+    @Operation(summary = "Activate reservation", description = "Transitions a CONFIRMED reservation to ACTIVE (vehicle picked up).")
+    public ResponseEntity<ReservationResource> activateReservation(@PathVariable Long id) {
+        var reservationOpt = queryService.handle(new GetReservationByIdQuery(id));
+        if (reservationOpt.isEmpty()) return ResponseEntity.notFound().build();
+        var resource = new UpdateReservationStatusResource();
+        resource.setActorId(reservationOpt.get().getOwnerId());
+        resource.setStatus("ACTIVE");
+        var command = updateStatusAssembler.toCommand(id, resource);
+        try {
+            var updated = commandService.handle(command);
+            return ResponseEntity.ok(resourceAssembler.toResource(updated));
+        } catch (IllegalStateException e) {
+            return ResponseEntity.badRequest().build();
+        }
+    }
+
+    @PostMapping("/{id}/complete")
+    @Operation(summary = "Complete reservation", description = "Transitions an ACTIVE reservation to COMPLETED (vehicle returned and confirmed).")
+    public ResponseEntity<ReservationResource> completeReservation(@PathVariable Long id) {
+        var reservationOpt = queryService.handle(new GetReservationByIdQuery(id));
+        if (reservationOpt.isEmpty()) return ResponseEntity.notFound().build();
+        var resource = new UpdateReservationStatusResource();
+        resource.setActorId(reservationOpt.get().getOwnerId());
+        resource.setStatus("COMPLETED");
+        var command = updateStatusAssembler.toCommand(id, resource);
+        try {
+            var updated = commandService.handle(command);
+            return ResponseEntity.ok(resourceAssembler.toResource(updated));
+        } catch (IllegalStateException e) {
+            return ResponseEntity.badRequest().build();
+        }
+    }
+
     @PostMapping("/{id}/confirm-return")
     @Operation(summary = "Confirm vehicle return", description = "Marks the reservation as returned and records the confirmation details.")
     public ResponseEntity<ReservationResource> confirmReturn(@PathVariable Long id, @RequestBody @Valid ConfirmReturnResource resource) {

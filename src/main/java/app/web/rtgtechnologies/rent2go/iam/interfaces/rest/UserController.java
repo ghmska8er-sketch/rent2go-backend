@@ -22,6 +22,7 @@ import app.web.rtgtechnologies.rent2go.iam.interfaces.rest.resources.UserResourc
 import app.web.rtgtechnologies.rent2go.iam.interfaces.rest.resources.VerifyEmailResource;
 import app.web.rtgtechnologies.rent2go.iam.interfaces.rest.resources.PasswordResetRequestResource;
 import app.web.rtgtechnologies.rent2go.iam.interfaces.rest.resources.PasswordResetConfirmResource;
+import app.web.rtgtechnologies.rent2go.iam.interfaces.rest.resources.PasswordResetResponseResource;
 import app.web.rtgtechnologies.rent2go.iam.interfaces.rest.resources.SubmitKycResource;
 import app.web.rtgtechnologies.rent2go.iam.interfaces.rest.transform.AuthTokenResourceFromUserAssembler;
 import app.web.rtgtechnologies.rent2go.iam.interfaces.rest.transform.LoginCommandFromResourceAssembler;
@@ -79,10 +80,10 @@ public class UserController {
     }
 
     @PostMapping("/password/request")
-    @Operation(summary = "Request password reset", description = "Starts the password recovery flow by sending a reset token to the user's email.")
-    public ResponseEntity<Void> requestPasswordReset(@Valid @RequestBody PasswordResetRequestResource resource) {
-        userCommandService.handle(new app.web.rtgtechnologies.rent2go.iam.domain.model.commands.RequestPasswordResetCommand(resource.email()));
-        return ResponseEntity.ok().build();
+    @Operation(summary = "Request password reset", description = "Starts the password recovery flow by sending a reset token to the user's email. The token is also returned in the response for testing purposes.")
+    public ResponseEntity<PasswordResetResponseResource> requestPasswordReset(@Valid @RequestBody PasswordResetRequestResource resource) {
+        String token = userCommandService.handle(new app.web.rtgtechnologies.rent2go.iam.domain.model.commands.RequestPasswordResetCommand(resource.email()));
+        return ResponseEntity.ok(new PasswordResetResponseResource(token, "Password reset email sent"));
     }
 
     @PostMapping("/password/reset")

@@ -2,8 +2,11 @@ package app.web.rtgtechnologies.rent2go.booking_reservations.infrastructure.pers
 
 import app.web.rtgtechnologies.rent2go.booking_reservations.domain.model.aggregates.Reservation;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.domain.Page;
@@ -31,4 +34,7 @@ public interface ReservationRepository extends JpaRepository<Reservation, Long> 
     List<Reservation> findAllByVehicleId(Long vehicleId);
 
     List<Reservation> findAllByVehicleIdAndIdNot(Long vehicleId, Long id);
+
+    @Query("SELECT r FROM Reservation r WHERE r.status.status = 'PENDING' AND r.dateRange.startDate < :today")
+    List<Reservation> findAllPendingExpiredBefore(@Param("today") LocalDate today);
 }

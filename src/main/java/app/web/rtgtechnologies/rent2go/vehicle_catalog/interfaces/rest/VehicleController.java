@@ -11,6 +11,9 @@ import app.web.rtgtechnologies.rent2go.vehicle_catalog.domain.model.services.Veh
 import app.web.rtgtechnologies.rent2go.vehicle_catalog.domain.model.services.VehicleQueryService;
 import app.web.rtgtechnologies.rent2go.vehicle_catalog.domain.model.valueobjects.SearchCriteria;
 import app.web.rtgtechnologies.rent2go.vehicle_catalog.infrastructure.persistence.jpa.repositories.VehicleCategoryRepository;
+import app.web.rtgtechnologies.rent2go.vehicle_catalog.infrastructure.persistence.jpa.repositories.VehicleRepository;
+import app.web.rtgtechnologies.rent2go.vehicle_catalog.domain.model.valueobjects.VehicleStatus;
+import app.web.rtgtechnologies.rent2go.booking_reservations.infrastructure.persistence.jpa.repositories.ReservationRepository;
 import app.web.rtgtechnologies.rent2go.vehicle_catalog.interfaces.rest.resources.CreateVehicleResource;
 import app.web.rtgtechnologies.rent2go.vehicle_catalog.interfaces.rest.resources.RegisterVehicleWithImageResource;
 import app.web.rtgtechnologies.rent2go.vehicle_catalog.interfaces.rest.resources.UpdateVehicleDetailsResource;
@@ -69,6 +72,8 @@ public class VehicleController {
     private final JwtTokenProvider jwtTokenProvider;
     private final CloudinaryStorageService cloudinaryStorageService;
     private final VehicleCategoryRepository vehicleCategoryRepository;
+    private final VehicleRepository vehicleRepository;
+    private final ReservationRepository reservationRepository;
 
     /**
      * GET /api/v1/vehicles/categories
@@ -432,6 +437,70 @@ public class VehicleController {
         Vehicle vehicle = vehicleCommandService.handle(command);
         VehicleResource response = VehicleResourceFromEntityAssembler.toResource(vehicle);
         return ResponseEntity.ok(response);
+    }
+
+    // VEH-04: owner can change status to AVAILABLE, MAINTENANCE, or INACTIVE/RETIRED
+    @PatchMapping("/{id}/status")
+    @PreAuthorize("hasRole('USER')")
+    @Operation(summary = "Update vehicle status",
+               description = "Allows the vehicle owner to set status to AVAILABLE or MAINTENANCE. ADMIN can also set RETIRED.")
+    public ResponseEntity<VehicleResource> updateVehicleStatus(
+            @PathVariable Long id,
+            @RequestParam String status,
+            @RequestHeader(value = "Authorization", required = false) String authHeader) {
+        Vehicle vehicle = vehicleRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("Vehicle not found: " + id));
+
+        VehicleStatus newStatus;
+        try {
+            newStatus = VehicleStatus.valueOf(status.toUpperCase());
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().build();
+        }
+
+        switch (newStatus) {
+            case AVAILABLE -> vehicle.makeAvailable();
+            case MAINTENANCE -> vehicle.markAsMaintenanceRequired();
+            case RETIRED -> vehicle.retire();
+            default -> { return ResponseEntity.badRequest().build(); }
+        }
+
+        vehicleRepository.save(vehicle);
+        return ResponseEntity.ok(VehicleResourceFromEntityAssembler.toResource(vehicle));
+    }
+
+    // VEH-02: ADMIN retires a vehicle (soft deactivation)
+    @PostMapping("/{id}/retire")
+    @PreAuthorize("hasRole('ADMIN')")
+    @Operation(summary = "Retire vehicle (admin)",
+               description = "Marks a vehicle as RETIRED so it no longer appears in public search.")
+    public ResponseEntity<VehicleResource> retireVehicle(@PathVariable Long id) {
+        Vehicle vehicle = vehicleRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("Vehicle not found: " + id));
+        vehicle.retire();
+        vehicleRepository.save(vehicle);
+        return ResponseEntity.ok(VehicleResourceFromEntityAssembler.toResource(vehicle));
+    }
+
+    // VEH-02: ADMIN hard-deletes a vehicle only if it has no active reservations
+    @DeleteMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
+    @Operation(summary = "Delete vehicle (admin)",
+               description = "Permanently deletes a vehicle. Returns 409 if the vehicle has PENDING, CONFIRMED, or ACTIVE reservations.")
+    public ResponseEntity<Void> deleteVehicle(@PathVariable Long id) {
+        if (!vehicleRepository.existsById(id)) return ResponseEntity.notFound().build();
+
+        var reservations = reservationRepository.findAllByVehicleId(id);
+        boolean hasActive = reservations.stream().anyMatch(r -> {
+            String s = r.getStatus().getStatus();
+            return "PENDING".equals(s) || "CONFIRMED".equals(s) || "ACTIVE".equals(s);
+        });
+        if (hasActive) {
+            return ResponseEntity.status(org.springframework.http.HttpStatus.CONFLICT).build();
+        }
+
+        vehicleRepository.deleteById(id);
+        return ResponseEntity.noContent().build();
     }
 
     private Long extractUserIdFromAuthHeader(String authHeader) {

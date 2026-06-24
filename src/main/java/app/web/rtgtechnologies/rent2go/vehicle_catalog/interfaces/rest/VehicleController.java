@@ -31,7 +31,6 @@ import app.web.rtgtechnologies.rent2go.vehicle_catalog.interfaces.rest.transform
 import app.web.rtgtechnologies.rent2go.shared.infrastructure.cloudinary.CloudinaryStorageService;
 import app.web.rtgtechnologies.rent2go.iam.infrastructure.services.JwtTokenProvider;
 import app.web.rtgtechnologies.rent2go.shared.interfaces.rest.resource.PagedResponse;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -127,34 +126,43 @@ public class VehicleController {
      * POST /api/v1/vehicles/with-image
      *
      * Register a new vehicle with a primary image file upload.
-     * The image file is uploaded to Cloudinary and the returned URL is set as the primary image.
-     * This endpoint accepts multipart/form-data with a vehicle JSON body and an image file.
+     * All vehicle fields are sent as regular form fields; the image is sent as a file part named "file".
      */
     @PostMapping(path = "/with-image", consumes = {"multipart/form-data"})
     @PreAuthorize("hasRole('USER')")
-    @Operation(summary = "Publish a new vehicle with a primary image file upload")
+    @Operation(summary = "Publish a new vehicle with a primary image file upload",
+               description = "Send all vehicle fields as multipart form fields plus the image as 'file'. No JSON part required.")
     public ResponseEntity<VehicleResource> registerVehicleWithImageFile(
         @RequestHeader(value = "Authorization", required = false) String authHeader,
-        @RequestPart("vehicle") String vehicleJson,
-        @RequestPart("file") org.springframework.web.multipart.MultipartFile file
+        @RequestParam("licensePlate") String licensePlate,
+        @RequestParam("make") String make,
+        @RequestParam("model") String model,
+        @RequestParam("year") Integer year,
+        @RequestParam("vin") String vin,
+        @RequestParam("dailyPrice") java.math.BigDecimal dailyPrice,
+        @RequestParam("categoryId") Long categoryId,
+        @RequestParam("location") String location,
+        @RequestParam(value = "description", required = false) String description,
+        @RequestParam(value = "seats", required = false) Integer seats,
+        @RequestParam("transmission") String transmission,
+        @RequestParam("fuelType") String fuelType,
+        @RequestParam(value = "latitude", required = false) Double latitude,
+        @RequestParam(value = "longitude", required = false) Double longitude,
+        @RequestParam(value = "featureNames", required = false) java.util.List<String> featureNames,
+        @RequestParam("file") org.springframework.web.multipart.MultipartFile file
     ) throws java.io.IOException {
 
         Long ownerId = extractUserIdFromAuthHeader(authHeader);
 
-        // Parse JSON to resource manually to avoid Content-Type issues
-        ObjectMapper mapper = new ObjectMapper();
-        RegisterVehicleWithImageResource vehicleResource = mapper.readValue(vehicleJson, RegisterVehicleWithImageResource.class);
-
-        // Upload image to Cloudinary
         String imageUrl = cloudinaryStorageService.upload(file);
 
-        // Convert resource to command using assembler
+        RegisterVehicleWithImageResource vehicleResource = new RegisterVehicleWithImageResource(
+            licensePlate, make, model, year, vin, dailyPrice, categoryId, location,
+            description, seats, transmission, fuelType, latitude, longitude, featureNames
+        );
+
         var command = RegisterVehicleWithImageCommandFromResourceAssembler.toCommand(ownerId, vehicleResource, imageUrl);
-
-        // Execute command
         Vehicle vehicle = vehicleCommandService.handle(command);
-
-        // Convert entity to resource using assembler
         VehicleResource response = VehicleResourceFromEntityAssembler.toResource(vehicle);
 
         return ResponseEntity.status(HttpStatus.CREATED).body(response);

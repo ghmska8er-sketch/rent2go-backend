@@ -11,11 +11,10 @@ public class CreateReservationCommandFromResourceAssembler {
         return new CreateReservationCommand(
             r.vehicleId(),
             r.renterId(),
-            r.ownerId(),
             r.startDate(),
             r.endDate(),
-            r.totalAmount()
-            , r.pickupLocation(),
+            r.totalAmount(),
+            r.pickupLocation(),
             r.returnLocation(),
             r.coveragePlan(),
             r.pickupPhotos(),

@@ -11,14 +11,13 @@ import java.time.LocalDate;
 public record CreateReservationCommand(
     Long vehicleId,
     Long renterId,
-    Long ownerId,
     LocalDate startDate,
     LocalDate endDate,
-    BigDecimal totalAmount
-    , String pickupLocation,
+    BigDecimal totalAmount,
+    String pickupLocation,
     String returnLocation,
     String coveragePlan,
     java.util.List<String> pickupPhotos,
     java.util.List<String> returnPhotos
-    ) {
+) {
 }

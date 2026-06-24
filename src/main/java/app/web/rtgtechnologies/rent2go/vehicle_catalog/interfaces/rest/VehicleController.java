@@ -6,9 +6,14 @@ import app.web.rtgtechnologies.rent2go.vehicle_catalog.domain.model.queries.GetV
 import app.web.rtgtechnologies.rent2go.vehicle_catalog.domain.model.queries.GetVehicleImagesQuery;
 import app.web.rtgtechnologies.rent2go.vehicle_catalog.domain.model.queries.GetVehiclesByOwnerQuery;
 import app.web.rtgtechnologies.rent2go.vehicle_catalog.domain.model.queries.SearchVehiclesByCriteriaQuery;
+import app.web.rtgtechnologies.rent2go.vehicle_catalog.domain.model.aggregates.VehicleCategory;
 import app.web.rtgtechnologies.rent2go.vehicle_catalog.domain.model.services.VehicleCommandService;
 import app.web.rtgtechnologies.rent2go.vehicle_catalog.domain.model.services.VehicleQueryService;
 import app.web.rtgtechnologies.rent2go.vehicle_catalog.domain.model.valueobjects.SearchCriteria;
+import app.web.rtgtechnologies.rent2go.vehicle_catalog.infrastructure.persistence.jpa.repositories.VehicleCategoryRepository;
+import app.web.rtgtechnologies.rent2go.vehicle_catalog.infrastructure.persistence.jpa.repositories.VehicleRepository;
+import app.web.rtgtechnologies.rent2go.vehicle_catalog.domain.model.valueobjects.VehicleStatus;
+import app.web.rtgtechnologies.rent2go.booking_reservations.infrastructure.persistence.jpa.repositories.ReservationRepository;
 import app.web.rtgtechnologies.rent2go.vehicle_catalog.interfaces.rest.resources.CreateVehicleResource;
 import app.web.rtgtechnologies.rent2go.vehicle_catalog.interfaces.rest.resources.RegisterVehicleWithImageResource;
 import app.web.rtgtechnologies.rent2go.vehicle_catalog.interfaces.rest.resources.UpdateVehicleDetailsResource;
@@ -26,7 +31,6 @@ import app.web.rtgtechnologies.rent2go.vehicle_catalog.interfaces.rest.transform
 import app.web.rtgtechnologies.rent2go.shared.infrastructure.cloudinary.CloudinaryStorageService;
 import app.web.rtgtechnologies.rent2go.iam.infrastructure.services.JwtTokenProvider;
 import app.web.rtgtechnologies.rent2go.shared.interfaces.rest.resource.PagedResponse;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -66,6 +70,31 @@ public class VehicleController {
     private final VehicleQueryService vehicleQueryService;
     private final JwtTokenProvider jwtTokenProvider;
     private final CloudinaryStorageService cloudinaryStorageService;
+    private final VehicleCategoryRepository vehicleCategoryRepository;
+    private final VehicleRepository vehicleRepository;
+    private final ReservationRepository reservationRepository;
+
+    /**
+     * GET /api/v1/vehicles/categories
+     *
+     * List all available vehicle categories so clients know valid filter values.
+     */
+    @GetMapping("/categories")
+    @Operation(summary = "List all vehicle categories")
+    public ResponseEntity<List<java.util.Map<String, Object>>> getCategories() {
+        var categories = vehicleCategoryRepository.findAll();
+        var result = categories.stream()
+            .map(c -> {
+                java.util.Map<String, Object> m = new java.util.LinkedHashMap<>();
+                m.put("id", c.getId());
+                m.put("name", c.getName());
+                m.put("description", c.getDescription());
+                m.put("iconUrl", c.getIconUrl());
+                return m;
+            })
+            .collect(Collectors.toList());
+        return ResponseEntity.ok(result);
+    }
 
     /**
      * POST /api/v1/vehicles
@@ -97,34 +126,43 @@ public class VehicleController {
      * POST /api/v1/vehicles/with-image
      *
      * Register a new vehicle with a primary image file upload.
-     * The image file is uploaded to Cloudinary and the returned URL is set as the primary image.
-     * This endpoint accepts multipart/form-data with a vehicle JSON body and an image file.
+     * All vehicle fields are sent as regular form fields; the image is sent as a file part named "file".
      */
     @PostMapping(path = "/with-image", consumes = {"multipart/form-data"})
     @PreAuthorize("hasRole('USER')")
-    @Operation(summary = "Publish a new vehicle with a primary image file upload")
+    @Operation(summary = "Publish a new vehicle with a primary image file upload",
+               description = "Send all vehicle fields as multipart form fields plus the image as 'file'. No JSON part required.")
     public ResponseEntity<VehicleResource> registerVehicleWithImageFile(
         @RequestHeader(value = "Authorization", required = false) String authHeader,
-        @RequestPart("vehicle") String vehicleJson,
-        @RequestPart("file") org.springframework.web.multipart.MultipartFile file
+        @RequestParam("licensePlate") String licensePlate,
+        @RequestParam("make") String make,
+        @RequestParam("model") String model,
+        @RequestParam("year") Integer year,
+        @RequestParam("vin") String vin,
+        @RequestParam("dailyPrice") java.math.BigDecimal dailyPrice,
+        @RequestParam("categoryId") Long categoryId,
+        @RequestParam("location") String location,
+        @RequestParam(value = "description", required = false) String description,
+        @RequestParam(value = "seats", required = false) Integer seats,
+        @RequestParam("transmission") String transmission,
+        @RequestParam("fuelType") String fuelType,
+        @RequestParam(value = "latitude", required = false) Double latitude,
+        @RequestParam(value = "longitude", required = false) Double longitude,
+        @RequestParam(value = "featureNames", required = false) java.util.List<String> featureNames,
+        @RequestParam("file") org.springframework.web.multipart.MultipartFile file
     ) throws java.io.IOException {
 
         Long ownerId = extractUserIdFromAuthHeader(authHeader);
 
-        // Parse JSON to resource manually to avoid Content-Type issues
-        ObjectMapper mapper = new ObjectMapper();
-        RegisterVehicleWithImageResource vehicleResource = mapper.readValue(vehicleJson, RegisterVehicleWithImageResource.class);
-
-        // Upload image to Cloudinary
         String imageUrl = cloudinaryStorageService.upload(file);
 
-        // Convert resource to command using assembler
+        RegisterVehicleWithImageResource vehicleResource = new RegisterVehicleWithImageResource(
+            licensePlate, make, model, year, vin, dailyPrice, categoryId, location,
+            description, seats, transmission, fuelType, latitude, longitude, featureNames
+        );
+
         var command = RegisterVehicleWithImageCommandFromResourceAssembler.toCommand(ownerId, vehicleResource, imageUrl);
-
-        // Execute command
         Vehicle vehicle = vehicleCommandService.handle(command);
-
-        // Convert entity to resource using assembler
         VehicleResource response = VehicleResourceFromEntityAssembler.toResource(vehicle);
 
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
@@ -407,6 +445,69 @@ public class VehicleController {
         Vehicle vehicle = vehicleCommandService.handle(command);
         VehicleResource response = VehicleResourceFromEntityAssembler.toResource(vehicle);
         return ResponseEntity.ok(response);
+    }
+
+    // VEH-04: owner can change status to AVAILABLE, MAINTENANCE, or INACTIVE/RETIRED
+    @PatchMapping("/{id}/status")
+    @PreAuthorize("hasRole('USER')")
+    @Operation(summary = "Update vehicle status",
+               description = "Allows the vehicle owner to set status to AVAILABLE or MAINTENANCE. ADMIN can also set RETIRED.")
+    public ResponseEntity<VehicleResource> updateVehicleStatus(
+            @PathVariable Long id,
+            @RequestParam String status,
+            @RequestHeader(value = "Authorization", required = false) String authHeader) {
+        Vehicle vehicle = vehicleRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("Vehicle not found: " + id));
+
+        VehicleStatus newStatus;
+        try {
+            newStatus = VehicleStatus.valueOf(status.toUpperCase());
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().build();
+        }
+
+        switch (newStatus) {
+            case AVAILABLE -> vehicle.makeAvailable();
+            case MAINTENANCE -> vehicle.markAsMaintenanceRequired();
+            case RETIRED -> vehicle.retire();
+            default -> { return ResponseEntity.badRequest().build(); }
+        }
+
+        vehicleRepository.save(vehicle);
+        return ResponseEntity.ok(VehicleResourceFromEntityAssembler.toResource(vehicle));
+    }
+
+    // VEH-02: ADMIN retires a vehicle (soft deactivation)
+    @PostMapping("/{id}/retire")
+    @Operation(summary = "Retire vehicle",
+               description = "Marks a vehicle as RETIRED so it no longer appears in public search.")
+    public ResponseEntity<VehicleResource> retireVehicle(@PathVariable Long id) {
+        Vehicle vehicle = vehicleRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("Vehicle not found: " + id));
+        vehicle.retire();
+        vehicleRepository.save(vehicle);
+        return ResponseEntity.ok(VehicleResourceFromEntityAssembler.toResource(vehicle));
+    }
+
+    // VEH-02: ADMIN hard-deletes a vehicle only if it has no active reservations
+    @DeleteMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
+    @Operation(summary = "[ADMIN ONLY] Delete vehicle",
+               description = "Permanently deletes a vehicle. Returns 409 if the vehicle has PENDING, CONFIRMED, or ACTIVE reservations.")
+    public ResponseEntity<Void> deleteVehicle(@PathVariable Long id) {
+        if (!vehicleRepository.existsById(id)) return ResponseEntity.notFound().build();
+
+        var reservations = reservationRepository.findAllByVehicleId(id);
+        boolean hasActive = reservations.stream().anyMatch(r -> {
+            String s = r.getStatus().getStatus();
+            return "PENDING".equals(s) || "CONFIRMED".equals(s) || "ACTIVE".equals(s);
+        });
+        if (hasActive) {
+            return ResponseEntity.status(org.springframework.http.HttpStatus.CONFLICT).build();
+        }
+
+        vehicleRepository.deleteById(id);
+        return ResponseEntity.noContent().build();
     }
 
     private Long extractUserIdFromAuthHeader(String authHeader) {

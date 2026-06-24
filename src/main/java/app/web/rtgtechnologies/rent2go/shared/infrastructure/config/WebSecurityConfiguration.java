@@ -1,6 +1,7 @@
 package app.web.rtgtechnologies.rent2go.shared.infrastructure.config;
 
 import app.web.rtgtechnologies.rent2go.iam.infrastructure.authorization.BearerAuthorizationRequestFilter;
+import app.web.rtgtechnologies.rent2go.iam.infrastructure.authorization.ForbiddenAccessDeniedHandler;
 import app.web.rtgtechnologies.rent2go.iam.infrastructure.authorization.UnauthorizedRequestHandlerEntryPoint;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.annotation.Bean;
@@ -29,13 +30,16 @@ public class WebSecurityConfiguration {
     private final UserDetailsService userDetailsService;
     private final app.web.rtgtechnologies.rent2go.iam.infrastructure.services.JwtTokenProvider tokenProvider;
     private final AuthenticationEntryPoint unauthorizedRequestHandler;
+    private final ForbiddenAccessDeniedHandler forbiddenAccessDeniedHandler;
 
     public WebSecurityConfiguration(@Qualifier("defaultUserDetailsService") UserDetailsService userDetailsService,
                                     app.web.rtgtechnologies.rent2go.iam.infrastructure.services.JwtTokenProvider tokenProvider,
-                                    UnauthorizedRequestHandlerEntryPoint authenticationEntryPoint) {
+                                    UnauthorizedRequestHandlerEntryPoint authenticationEntryPoint,
+                                    ForbiddenAccessDeniedHandler forbiddenAccessDeniedHandler) {
         this.userDetailsService = userDetailsService;
         this.tokenProvider = tokenProvider;
         this.unauthorizedRequestHandler = authenticationEntryPoint;
+        this.forbiddenAccessDeniedHandler = forbiddenAccessDeniedHandler;
     }
 
     @Bean
@@ -72,7 +76,9 @@ public class WebSecurityConfiguration {
         }));
 
         http.csrf(csrfConfigurer -> csrfConfigurer.disable())
-                .exceptionHandling(exceptionHandling -> exceptionHandling.authenticationEntryPoint(unauthorizedRequestHandler))
+                .exceptionHandling(exceptionHandling -> exceptionHandling
+                    .authenticationEntryPoint(unauthorizedRequestHandler)
+                    .accessDeniedHandler(forbiddenAccessDeniedHandler))
                 .sessionManagement(customizer -> customizer.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(authorizeRequests -> authorizeRequests
                     .requestMatchers(HttpMethod.POST,

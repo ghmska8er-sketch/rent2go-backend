@@ -45,6 +45,7 @@ import app.web.rtgtechnologies.rent2go.community_trust.interfaces.rest.resources
 import app.web.rtgtechnologies.rent2go.community_trust.interfaces.rest.resources.SubmitReviewResource;
 import app.web.rtgtechnologies.rent2go.community_trust.interfaces.rest.resources.UserReputationResource;
 import app.web.rtgtechnologies.rent2go.community_trust.interfaces.rest.resources.VehicleRatingResource;
+import app.web.rtgtechnologies.rent2go.community_trust.infrastructure.persistence.jpa.repositories.UserReputationRepository;
 import jakarta.validation.Valid;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -65,6 +66,7 @@ public class CommunityTrustController {
     private final ReviewQueryServiceImpl queryService;
     private final ConversationCommandServiceImpl conversationCommandService;
     private final ConversationQueryServiceImpl conversationQueryService;
+    private final UserReputationRepository userReputationRepository;
     private final SubmitReviewCommandFromResourceAssembler submitAssembler;
     private final FlagReviewCommandFromResourceAssembler flagAssembler;
     private final ModerationActionCommandFromResourceAssembler moderationAssembler;
@@ -178,6 +180,26 @@ public class CommunityTrustController {
         BlockUserForTrustCommand command = blockAssembler.toCommand(userId, resource);
         commandService.handle(command);
         return ResponseEntity.noContent().build();
+    }
+
+    @GetMapping("/users/blocked")
+    @Operation(summary = "List blocked users",
+               description = "Returns all users whose trust reputation is marked as blocked, including the moderation reason.")
+    public ResponseEntity<List<UserReputationResource>> getBlockedUsers() {
+        var blocked = userReputationRepository.findAllByBlocked(true).stream()
+            .map(rep -> new UserReputationResource(
+                rep.getUserId(),
+                rep.getApprovedReviewCount(),
+                rep.getAverageRating(),
+                rep.getTrustScore(),
+                rep.isBlocked(),
+                rep.getLastModerationReason(),
+                rep.getCompletedTrips(),
+                rep.getAcceptanceRate(),
+                rep.getResponseRate()
+            ))
+            .toList();
+        return ResponseEntity.ok(blocked);
     }
 
     @PostMapping("/reservations/{reservationId}/disputes")

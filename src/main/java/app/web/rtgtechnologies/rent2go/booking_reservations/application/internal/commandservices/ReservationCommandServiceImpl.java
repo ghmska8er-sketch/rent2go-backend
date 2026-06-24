@@ -10,6 +10,7 @@ import app.web.rtgtechnologies.rent2go.booking_reservations.domain.model.service
 import app.web.rtgtechnologies.rent2go.booking_reservations.domain.model.commands.UpdateReservationStatusCommand;
 import app.web.rtgtechnologies.rent2go.booking_reservations.domain.model.services.NotificationService;
 import app.web.rtgtechnologies.rent2go.vehicle_catalog.infrastructure.persistence.jpa.repositories.VehicleRepository;
+import app.web.rtgtechnologies.rent2go.community_trust.infrastructure.persistence.jpa.repositories.UserReputationRepository;
 import lombok.AllArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -28,6 +29,7 @@ public class ReservationCommandServiceImpl implements ReservationCommandService 
     private final VehicleAvailabilityQueryService availabilityQueryService;
     private final NotificationService notificationService;
     private final VehicleRepository vehicleRepository;
+    private final UserReputationRepository userReputationRepository;
 
     @Override
     public Reservation handle(CreateReservationCommand command) {
@@ -35,6 +37,13 @@ public class ReservationCommandServiceImpl implements ReservationCommandService 
         var vehicle = vehicleRepository.findById(command.vehicleId())
             .orElseThrow(() -> new IllegalArgumentException("Vehicle not found: " + command.vehicleId()));
         Long ownerId = vehicle.getOwnerId();
+
+        // RES-08: reject if renter is globally blocked in the community trust context
+        userReputationRepository.findByUserId(command.renterId()).ifPresent(rep -> {
+            if (rep.isBlocked()) {
+                throw new IllegalStateException("El arrendatario tiene acceso bloqueado a la plataforma.");
+            }
+        });
 
         DateRange requestedRange = DateRange.of(command.startDate(), command.endDate());
 

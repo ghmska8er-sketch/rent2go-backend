@@ -33,7 +33,7 @@ public class PromoCodeController {
 
     @PostMapping
     @PreAuthorize("hasRole('ADMIN')")
-    @Operation(summary = "Create promo code", description = "Creates a new promo code. Returns 409 if the code already exists.")
+    @Operation(summary = "[ADMIN ONLY] Create promo code", description = "Creates a new promo code. Returns 409 if the code already exists.")
     public ResponseEntity<PromoCodeResource> create(@Valid @RequestBody CreatePromoRequest req) {
         LocalDateTime expires = null;
         if (req.getExpiresAt() != null) {
@@ -54,7 +54,7 @@ public class PromoCodeController {
 
     @PatchMapping("/{code}/deactivate")
     @PreAuthorize("hasRole('ADMIN')")
-    @Operation(summary = "Deactivate promo code", description = "Disables a promo code so it can no longer be applied.")
+    @Operation(summary = "[ADMIN ONLY] Deactivate promo code", description = "Disables a promo code so it can no longer be applied.")
     public ResponseEntity<Void> deactivate(@PathVariable @NotBlank(message = "Code is required") String code) {
         boolean ok = promoService.deactivateByCode(code);
         return ok ? ResponseEntity.noContent().build() : ResponseEntity.notFound().build();
@@ -73,7 +73,7 @@ public class PromoCodeController {
 
     @GetMapping
     @PreAuthorize("hasRole('ADMIN')")
-    @Operation(summary = "List promo codes", description = "Returns all stored promo codes for admin management.")
+    @Operation(summary = "[ADMIN ONLY] List promo codes", description = "Returns all stored promo codes for admin management.")
     public ResponseEntity<List<PromoCodeResource>> listAll() {
         List<app.web.rtgtechnologies.rent2go.payments.domain.model.entities.PromoCode> all = promoService.listAll();
         var res = all.stream().map(p -> {
@@ -87,7 +87,7 @@ public class PromoCodeController {
 
     @DeleteMapping("/{code}")
     @PreAuthorize("hasRole('ADMIN')")
-    @Operation(summary = "Delete promo code", description = "Removes a promo code from the system entirely.")
+    @Operation(summary = "[ADMIN ONLY] Delete promo code", description = "Removes a promo code from the system entirely.")
     public ResponseEntity<Void> delete(@PathVariable @NotBlank(message = "Code is required") String code) {
         boolean ok = promoService.deleteByCode(code);
         return ok ? ResponseEntity.noContent().build() : ResponseEntity.notFound().build();

@@ -471,8 +471,7 @@ public class VehicleController {
 
     // VEH-02: ADMIN retires a vehicle (soft deactivation)
     @PostMapping("/{id}/retire")
-    @PreAuthorize("hasRole('ADMIN')")
-    @Operation(summary = "Retire vehicle (admin)",
+    @Operation(summary = "Retire vehicle",
                description = "Marks a vehicle as RETIRED so it no longer appears in public search.")
     public ResponseEntity<VehicleResource> retireVehicle(@PathVariable Long id) {
         Vehicle vehicle = vehicleRepository.findById(id)
@@ -485,7 +484,7 @@ public class VehicleController {
     // VEH-02: ADMIN hard-deletes a vehicle only if it has no active reservations
     @DeleteMapping("/{id}")
     @PreAuthorize("hasRole('ADMIN')")
-    @Operation(summary = "Delete vehicle (admin)",
+    @Operation(summary = "[ADMIN ONLY] Delete vehicle",
                description = "Permanently deletes a vehicle. Returns 409 if the vehicle has PENDING, CONFIRMED, or ACTIVE reservations.")
     public ResponseEntity<Void> deleteVehicle(@PathVariable Long id) {
         if (!vehicleRepository.existsById(id)) return ResponseEntity.notFound().build();

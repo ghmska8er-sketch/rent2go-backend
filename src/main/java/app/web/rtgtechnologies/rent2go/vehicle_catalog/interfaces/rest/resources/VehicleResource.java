@@ -45,4 +45,12 @@ public class VehicleResource {
     private String primaryImagePath;
     private Date createdAt;
     private Date updatedAt;
+
+    /**
+     * US14 AC2: optional warning surfaced when an action on this vehicle (e.g. pausing it)
+     * has a side effect the owner should know about, such as existing PENDING reservation
+     * requests. Null/absent when there is nothing to warn about — additive-only field,
+     * existing callers that don't read it are unaffected.
+     */
+    private String warning;
 }

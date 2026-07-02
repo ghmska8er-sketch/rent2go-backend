@@ -21,6 +21,8 @@ public record UserResource(
         Boolean phoneVerified,
         @JsonProperty("two_factor_enabled")
         Boolean twoFactorEnabled,
+        @JsonProperty("kyc_verified")
+        Boolean kycVerified,
         @JsonProperty("created_at")
         Date createdAt,
         @JsonProperty("updated_at")

@@ -49,6 +49,9 @@ public class User extends AuditableAbstractAggregateRoot<User> {
     @Column(name = "two_factor_enabled")
     private Boolean twoFactorEnabled;
 
+    @Column(name = "kyc_verified", nullable = false)
+    private Boolean kycVerified;
+
     public User() {
     }
 
@@ -64,6 +67,7 @@ public class User extends AuditableAbstractAggregateRoot<User> {
         this.emailVerified = false;
         this.phoneVerified = false;
         this.twoFactorEnabled = false;
+        this.kycVerified = false;
     }
 
     public Email getEmail() {
@@ -154,6 +158,14 @@ public class User extends AuditableAbstractAggregateRoot<User> {
         this.twoFactorEnabled = twoFactorEnabled;
     }
 
+    public Boolean getKycVerified() {
+        return kycVerified;
+    }
+
+    public void setKycVerified(Boolean kycVerified) {
+        this.kycVerified = kycVerified;
+    }
+
     public void activate() {
         this.status = UserStatus.ACTIVE;
     }
@@ -180,5 +192,9 @@ public class User extends AuditableAbstractAggregateRoot<User> {
 
     public boolean isPhoneVerified() {
         return Boolean.TRUE.equals(this.phoneVerified);
+    }
+
+    public boolean isKycVerified() {
+        return Boolean.TRUE.equals(this.kycVerified);
     }
 }

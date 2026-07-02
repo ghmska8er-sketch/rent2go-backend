@@ -23,4 +23,13 @@ public interface PaymentRepository extends JpaRepository<Payment, Long> {
             "WHERE r.owner_id = :ownerId AND p.status = 'SUCCEEDED' " +
             "AND p.created_at BETWEEN :from AND :to", nativeQuery = true)
         Long countSucceededPaymentsByOwnerBetween(@Param("ownerId") Long ownerId, @Param("from") LocalDateTime from, @Param("to") LocalDateTime to);
+
+    /**
+     * US24: Sum succeeded payment amounts (in cents) for a single vehicle within a date range.
+     * Joins through reservations to filter by vehicle_id.
+     */
+    @Query(value = "SELECT SUM(p.amount_cents) FROM payments p JOIN reservations r ON p.reservation_id = r.id " +
+            "WHERE r.vehicle_id = :vehicleId AND p.status = 'SUCCEEDED' " +
+            "AND p.created_at BETWEEN :from AND :to", nativeQuery = true)
+    Long sumSucceededAmountCentsByVehicleBetween(@Param("vehicleId") Long vehicleId, @Param("from") LocalDateTime from, @Param("to") LocalDateTime to);
 }

@@ -51,4 +51,30 @@ public class ResendEmailService implements EmailService {
             throw new RuntimeException("Failed to send password reset email", e);
         }
     }
+
+    @Override
+    public void sendVerificationEmail(String toEmail, String token) {
+        String html = """
+                <h2>Verifica tu cuenta - Rent2Go</h2>
+                <p>Usa el siguiente token para verificar tu correo electrónico:</p>
+                <p style="font-size:20px;font-weight:bold;letter-spacing:2px;">%s</p>
+                <p>Este token expira en <strong>24 horas</strong>.</p>
+                <p>Si no creaste esta cuenta, ignora este correo.</p>
+                """.formatted(token);
+
+        CreateEmailOptions params = CreateEmailOptions.builder()
+                .from(fromEmail)
+                .to(toEmail)
+                .subject("Verifica tu cuenta - Rent2Go")
+                .html(html)
+                .build();
+
+        try {
+            CreateEmailResponse response = resend.emails().send(params);
+            log.info("[EmailVerification] Email sent to {} | id={}", toEmail, response.getId());
+        } catch (ResendException e) {
+            log.error("[EmailVerification] Failed to send email to {}: {}", toEmail, e.getMessage());
+            throw new RuntimeException("Failed to send verification email", e);
+        }
+    }
 }

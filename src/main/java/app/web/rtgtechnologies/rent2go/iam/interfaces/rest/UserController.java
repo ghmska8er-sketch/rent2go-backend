@@ -113,12 +113,18 @@ public class UserController {
     }
 
     @PostMapping("/kyc")
-    @Operation(summary = "Submit KYC", description = "Submits identity verification data for review.")
-    public ResponseEntity<Void> submitKyc(@Valid @RequestBody SubmitKycResource resource) {
-        Long id = userCommandService.handle(new app.web.rtgtechnologies.rent2go.iam.domain.model.commands.SubmitKycCommand(
-            resource.userId(), resource.fullName(), resource.idNumber(), resource.dniFrontUrl(), resource.dniBackUrl(), resource.driverLicenseUrl()
-        ));
-        return ResponseEntity.status(HttpStatus.CREATED).build();
+    @Operation(summary = "Submit KYC", description = "Submits identity verification data for review and returns the updated user profile.")
+    public ResponseEntity<UserResource> submitKyc(@Valid @RequestBody SubmitKycResource resource) {
+        try {
+            userCommandService.handle(new app.web.rtgtechnologies.rent2go.iam.domain.model.commands.SubmitKycCommand(
+                resource.userId(), resource.fullName(), resource.idNumber(), resource.dniFrontUrl(), resource.dniBackUrl(), resource.driverLicenseUrl()
+            ));
+            User user = userQueryService.handle(new GetUserByIdQuery(resource.userId()))
+                    .orElseThrow(() -> new IllegalArgumentException("User not found"));
+            return ResponseEntity.status(HttpStatus.CREATED).body(userResourceAssembler.toResourceFromEntity(user));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().build();
+        }
     }
 
     @PostMapping("/login")
@@ -235,8 +241,8 @@ public class UserController {
     @PostMapping(value = "/kyc/multipart", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @PreAuthorize("hasRole('USER')")
     @Operation(summary = "Submit KYC (multipart)",
-               description = "Submits identity verification. Accepts dniFront, dniBack, and driverLicense as file uploads.")
-    public ResponseEntity<Void> submitKycMultipart(
+               description = "Submits identity verification. Accepts dniFront, dniBack, and driverLicense as file uploads. Returns the updated user profile.")
+    public ResponseEntity<UserResource> submitKycMultipart(
             @RequestParam Long userId,
             @RequestParam String fullName,
             @RequestParam String idNumber,
@@ -252,7 +258,9 @@ public class UserController {
             userCommandService.handle(new app.web.rtgtechnologies.rent2go.iam.domain.model.commands.SubmitKycCommand(
                 userId, fullName, idNumber, dniFrontUrl, dniBackUrl, driverLicenseUrl
             ));
-            return ResponseEntity.status(HttpStatus.CREATED).build();
+            User user = userQueryService.handle(new GetUserByIdQuery(userId))
+                    .orElseThrow(() -> new IllegalArgumentException("User not found"));
+            return ResponseEntity.status(HttpStatus.CREATED).body(userResourceAssembler.toResourceFromEntity(user));
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().build();
         } catch (Exception e) {

@@ -11,7 +11,11 @@ import app.web.rtgtechnologies.rent2go.payments.interfaces.rest.resources.Discou
 import app.web.rtgtechnologies.rent2go.payments.interfaces.rest.resources.EarningsReportResource;
 import app.web.rtgtechnologies.rent2go.payments.interfaces.rest.resources.FeeDto;
 import app.web.rtgtechnologies.rent2go.payments.interfaces.rest.resources.MoneyResource;
+import app.web.rtgtechnologies.rent2go.payments.interfaces.rest.resources.VehiclePerformanceResource;
+import app.web.rtgtechnologies.rent2go.payments.application.internal.services.VehiclePerformanceService;
 import lombok.RequiredArgsConstructor;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
@@ -43,10 +47,13 @@ import jakarta.validation.constraints.Positive;
 @Validated
 public class PaymentsController {
 
+    private static final Logger log = LoggerFactory.getLogger(PaymentsController.class);
+
     private final FareCalculationServiceImpl fareCalculationService;
     private final StripePaymentService stripePaymentService;
     private final app.web.rtgtechnologies.rent2go.payments.application.internal.services.PaymentsService paymentsService;
     private final app.web.rtgtechnologies.rent2go.payments.application.internal.services.PromoService promoService;
+    private final VehiclePerformanceService vehiclePerformanceService;
 
     @Value("${stripe.webhook-secret:}")
     private String stripeWebhookSecret;
@@ -256,6 +263,28 @@ public class PaymentsController {
             resource.setNextPayoutDate(java.time.LocalDate.now().plusDays(7).toString());
             return ResponseEntity.ok(resource);
         } catch (DateTimeParseException ex) {
+            return ResponseEntity.badRequest().build();
+        }
+    }
+
+    @GetMapping("/vehicles/{vehicleId}/performance")
+    @PreAuthorize("hasRole('USER')")
+    @Operation(summary = "Get per-vehicle performance",
+               description = "Returns reservation count, revenue sum, and occupancy percentage for a single vehicle, " +
+                             "optionally scoped to a date range. Returns all zeros for a vehicle with no reservation history.")
+    public ResponseEntity<VehiclePerformanceResource> getVehiclePerformance(
+            @PathVariable @Positive(message = "Vehicle ID must be positive") Long vehicleId,
+            @RequestParam(required = false) String from,
+            @RequestParam(required = false) String to) {
+        log.info("GET vehicle performance requested for vehicleId={}, from={}, to={}", vehicleId, from, to);
+        try {
+            LocalDate fromDate = (from != null && !from.isBlank()) ? LocalDate.parse(from) : null;
+            LocalDate toDate = (to != null && !to.isBlank()) ? LocalDate.parse(to) : null;
+
+            VehiclePerformanceResource resource = vehiclePerformanceService.getPerformance(vehicleId, fromDate, toDate);
+            return ResponseEntity.ok(resource);
+        } catch (DateTimeParseException ex) {
+            log.error("Invalid date format for vehicle performance request, vehicleId={}", vehicleId, ex);
             return ResponseEntity.badRequest().build();
         }
     }

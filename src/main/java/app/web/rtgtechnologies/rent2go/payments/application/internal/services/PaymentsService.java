@@ -51,4 +51,8 @@ public class PaymentsService {
     public Long countSucceededPaymentsByOwnerBetween(Long ownerId, java.time.LocalDateTime from, java.time.LocalDateTime to) {
         return paymentRepository.countSucceededPaymentsByOwnerBetween(ownerId, from, to);
     }
+
+    public Long sumSucceededAmountCentsByVehicleBetween(Long vehicleId, java.time.LocalDateTime from, java.time.LocalDateTime to) {
+        return paymentRepository.sumSucceededAmountCentsByVehicleBetween(vehicleId, from, to);
+    }
 }

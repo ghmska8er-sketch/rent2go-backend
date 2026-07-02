@@ -474,7 +474,20 @@ public class VehicleController {
         }
 
         vehicleRepository.save(vehicle);
-        return ResponseEntity.ok(VehicleResourceFromEntityAssembler.toResource(vehicle));
+
+        VehicleResource response = VehicleResourceFromEntityAssembler.toResource(vehicle);
+
+        // US14 AC2: pausing (MAINTENANCE) a vehicle that has PENDING reservation requests
+        // must surface a warning instead of silently succeeding with zero signal.
+        if (newStatus == VehicleStatus.MAINTENANCE) {
+            boolean hasPendingRequests = reservationRepository.findAllByVehicleId(id).stream()
+                    .anyMatch(r -> "PENDING".equals(r.getStatus().getStatus()));
+            if (hasPendingRequests) {
+                response.setWarning("This vehicle has pending reservation requests. Pausing it will not automatically cancel them; review and resolve them separately.");
+            }
+        }
+
+        return ResponseEntity.ok(response);
     }
 
     // VEH-02: ADMIN retires a vehicle (soft deactivation)
@@ -493,8 +506,9 @@ public class VehicleController {
     @DeleteMapping("/{id}")
     @PreAuthorize("hasRole('ADMIN')")
     @Operation(summary = "[ADMIN ONLY] Delete vehicle",
-               description = "Permanently deletes a vehicle. Returns 409 if the vehicle has PENDING, CONFIRMED, or ACTIVE reservations.")
-    public ResponseEntity<Void> deleteVehicle(@PathVariable Long id) {
+               description = "Permanently deletes a vehicle. Returns 409 if the vehicle has PENDING, CONFIRMED, or ACTIVE reservations, " +
+                             "with a message suggesting pausing/deactivating the vehicle instead.")
+    public ResponseEntity<?> deleteVehicle(@PathVariable Long id) {
         if (!vehicleRepository.existsById(id)) return ResponseEntity.notFound().build();
 
         var reservations = reservationRepository.findAllByVehicleId(id);
@@ -503,7 +517,13 @@ public class VehicleController {
             return "PENDING".equals(s) || "CONFIRMED".equals(s) || "ACTIVE".equals(s);
         });
         if (hasActive) {
-            return ResponseEntity.status(org.springframework.http.HttpStatus.CONFLICT).build();
+            // US17 AC2: bare 409 is not enough — explicitly suggest pausing/deactivating
+            // (despublicar) the vehicle as an alternative to deletion.
+            java.util.Map<String, String> body = new java.util.LinkedHashMap<>();
+            body.put("error", "Conflict");
+            body.put("message", "This vehicle cannot be deleted because it has reservation history (PENDING, CONFIRMED, or ACTIVE reservations). "
+                    + "Consider pausing it (set status to MAINTENANCE) or retiring/despublicando it instead of deleting it.");
+            return ResponseEntity.status(org.springframework.http.HttpStatus.CONFLICT).body(body);
         }
 
         vehicleRepository.deleteById(id);

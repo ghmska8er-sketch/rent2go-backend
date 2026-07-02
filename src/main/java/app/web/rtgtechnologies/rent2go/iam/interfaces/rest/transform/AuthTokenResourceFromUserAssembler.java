@@ -20,7 +20,8 @@ public class AuthTokenResourceFromUserAssembler {
             user.getEmailVerified(),
             user.getPhoneVerified(),
             user.getTwoFactorEnabled(),
-            user.getProfileImageUrl()
+            user.getProfileImageUrl(),
+            user.getKycVerified()
         );
     }
 }

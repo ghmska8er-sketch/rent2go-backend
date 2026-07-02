@@ -14,4 +14,9 @@ public class LoggingEmailService implements EmailService {
         //log.info("[PasswordReset] To: {} (token hidden in logs for security)", toEmail);
         log.info("[PasswordReset] To: {} | Token: {}", toEmail, token);
     }
+
+    @Override
+    public void sendVerificationEmail(String toEmail, String token) {
+        log.info("[EmailVerification] To: {} | Token: {}", toEmail, token);
+    }
 }

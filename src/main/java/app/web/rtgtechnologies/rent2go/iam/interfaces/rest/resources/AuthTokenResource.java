@@ -12,6 +12,7 @@ public record AuthTokenResource(
         Boolean emailVerified,
         Boolean phoneVerified,
         Boolean twoFactorEnabled,
-        String profileImageUrl
+        String profileImageUrl,
+        Boolean kycVerified
 ) {
 }

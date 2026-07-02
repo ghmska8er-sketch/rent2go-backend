@@ -156,8 +156,9 @@ public class UserCommandServiceImpl implements UserCommandService {
         // mark user as pending verification if not already
         if (!app.web.rtgtechnologies.rent2go.iam.domain.model.valueobjects.UserStatus.PENDING_VERIFICATION.equals(user.getStatus())) {
             user.setStatus(app.web.rtgtechnologies.rent2go.iam.domain.model.valueobjects.UserStatus.PENDING_VERIFICATION);
-            userRepository.save(user);
         }
+        user.setKycVerified(true);
+        userRepository.save(user);
 
         return saved.getId();
     }

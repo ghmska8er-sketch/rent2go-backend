@@ -20,6 +20,7 @@ public class UserResourceFromEntityAssembler {
                 user.getEmailVerified(),
             user.getPhoneVerified(),
                 user.getTwoFactorEnabled(),
+                user.getKycVerified(),
                 user.getCreatedAt(),
                 user.getUpdatedAt()
         );

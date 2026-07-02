@@ -31,18 +31,21 @@ public class UserCommandServiceImpl implements UserCommandService {
     private final PasswordResetTokenRepository passwordResetTokenRepository;
     private final app.web.rtgtechnologies.rent2go.iam.infrastructure.persistence.jpa.repositories.KycApplicationRepository kycApplicationRepository;
     private final app.web.rtgtechnologies.rent2go.iam.infrastructure.persistence.jpa.repositories.TwoFactorTokenRepository twoFactorTokenRepository;
+    private final app.web.rtgtechnologies.rent2go.iam.infrastructure.persistence.jpa.repositories.EmailVerificationTokenRepository emailVerificationTokenRepository;
     private final EmailService emailService;
 
     public UserCommandServiceImpl(UserRepository userRepository, JwtTokenProvider jwtTokenProvider,
                                   PasswordResetTokenRepository passwordResetTokenRepository,
                                   app.web.rtgtechnologies.rent2go.iam.infrastructure.persistence.jpa.repositories.KycApplicationRepository kycApplicationRepository,
                                   app.web.rtgtechnologies.rent2go.iam.infrastructure.persistence.jpa.repositories.TwoFactorTokenRepository twoFactorTokenRepository,
+                                  app.web.rtgtechnologies.rent2go.iam.infrastructure.persistence.jpa.repositories.EmailVerificationTokenRepository emailVerificationTokenRepository,
                                   EmailService emailService) {
         this.userRepository = userRepository;
         this.jwtTokenProvider = jwtTokenProvider;
         this.passwordResetTokenRepository = passwordResetTokenRepository;
         this.kycApplicationRepository = kycApplicationRepository;
         this.twoFactorTokenRepository = twoFactorTokenRepository;
+        this.emailVerificationTokenRepository = emailVerificationTokenRepository;
         this.emailService = emailService;
     }
 
@@ -85,6 +88,16 @@ public class UserCommandServiceImpl implements UserCommandService {
 
         // Guardar
         User savedUser = userRepository.save(user);
+
+        // Generar y enviar token de verificación de email
+        String token = UUID.randomUUID().toString();
+        Instant now = Instant.now();
+        Instant expiresAt = now.plus(24, ChronoUnit.HOURS);
+        var verificationToken = new app.web.rtgtechnologies.rent2go.iam.infrastructure.persistence.jpa.entities.EmailVerificationToken(
+                token, savedUser.getId(), expiresAt, now
+        );
+        emailVerificationTokenRepository.save(verificationToken);
+        emailService.sendVerificationEmail(savedUser.getEmail().getValue(), token);
 
         return savedUser.getId();
     }
@@ -129,6 +142,17 @@ public class UserCommandServiceImpl implements UserCommandService {
 
     @Override
     public void handle(VerifyEmailCommand command) {
+        var tokenEntity = emailVerificationTokenRepository.findByToken(command.token())
+                .orElseThrow(() -> new IllegalArgumentException("Invalid token"));
+
+        if (!tokenEntity.getUserId().equals(command.userId())) {
+            throw new IllegalArgumentException("Invalid token");
+        }
+
+        if (tokenEntity.getExpiresAt().isBefore(Instant.now())) {
+            throw new IllegalArgumentException("Token expired");
+        }
+
         User user = userRepository.findById(command.userId())
                 .orElseThrow(() -> new IllegalArgumentException("User not found: " + command.userId()));
 
@@ -139,6 +163,9 @@ public class UserCommandServiceImpl implements UserCommandService {
         user.activate();
 
         userRepository.save(user);
+
+        // consume token
+        emailVerificationTokenRepository.deleteByUserId(user.getId());
     }
 
     @Override

@@ -13,6 +13,12 @@ import app.web.rtgtechnologies.rent2go.payments.interfaces.rest.resources.FeeDto
 import app.web.rtgtechnologies.rent2go.payments.interfaces.rest.resources.MoneyResource;
 import app.web.rtgtechnologies.rent2go.payments.interfaces.rest.resources.VehiclePerformanceResource;
 import app.web.rtgtechnologies.rent2go.payments.application.internal.services.VehiclePerformanceService;
+import app.web.rtgtechnologies.rent2go.payments.application.internal.services.WithdrawalService;
+import app.web.rtgtechnologies.rent2go.payments.interfaces.rest.resources.CreateWithdrawalRequest;
+import app.web.rtgtechnologies.rent2go.payments.interfaces.rest.resources.WithdrawalResource;
+import app.web.rtgtechnologies.rent2go.payments.interfaces.rest.resources.EarningsMovementResource;
+import app.web.rtgtechnologies.rent2go.shared.application.internal.services.CurrentUserService;
+import app.web.rtgtechnologies.rent2go.shared.interfaces.rest.resource.PagedResponse;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -22,6 +28,7 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.validation.annotation.Validated;
 
 import java.math.BigDecimal;
+import java.net.URI;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeParseException;
@@ -38,6 +45,8 @@ import org.springframework.beans.factory.annotation.Value;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Positive;
+import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.Max;
 
 
 @Tag(name = "Payments", description = "Fare calculation, payment intents, refunds and earnings reports")
@@ -54,6 +63,8 @@ public class PaymentsController {
     private final app.web.rtgtechnologies.rent2go.payments.application.internal.services.PaymentsService paymentsService;
     private final app.web.rtgtechnologies.rent2go.payments.application.internal.services.PromoService promoService;
     private final VehiclePerformanceService vehiclePerformanceService;
+    private final CurrentUserService currentUserService;
+    private final WithdrawalService withdrawalService;
 
     @Value("${stripe.webhook-secret:}")
     private String stripeWebhookSecret;
@@ -239,6 +250,9 @@ public class PaymentsController {
             @PathVariable @Positive(message = "Owner ID must be positive") Long ownerId,
             @RequestParam @NotBlank(message = "From date is required") String from,
             @RequestParam @NotBlank(message = "To date is required") String to) {
+        if (!currentUserService.isOwnerOrAdmin(ownerId)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+        }
         try {
             var fromDate = LocalDate.parse(from).atStartOfDay();
             var toDate = LocalDate.parse(to).atTime(23, 59, 59);
@@ -256,10 +270,17 @@ public class PaymentsController {
             long cents = totalCents != null ? totalCents : 0L;
             resource.setTotalAmountCents(cents);
             resource.setTotalAmount(BigDecimal.valueOf(cents).divide(BigDecimal.valueOf(100), 2, java.math.RoundingMode.HALF_UP));
-            resource.setAvailablePayoutCents(cents);
-            resource.setPendingPayoutCents(0L);
+
+            // Phase 3: availablePayoutCents/pendingPayoutCents are now derived from the real
+            // withdrawal ledger instead of hardcoded placeholders. Note: these two fields are
+            // owner-lifetime derived values (not scoped to the from/to range), matching the
+            // withdrawal balance calculation used by POST/GET .../withdrawals.
+            long availableCents = withdrawalService.getAvailableBalanceCents(ownerId);
+            long pendingCents = withdrawalService.getPendingWithdrawnCents(ownerId);
+            resource.setAvailablePayoutCents(availableCents);
+            resource.setPendingPayoutCents(pendingCents);
             resource.setPaymentsCount(paymentCount != null ? paymentCount : 0L);
-            resource.setAvailableNowCents(cents);
+            resource.setAvailableNowCents(availableCents);
             resource.setNextPayoutDate(java.time.LocalDate.now().plusDays(7).toString());
             return ResponseEntity.ok(resource);
         } catch (DateTimeParseException ex) {
@@ -287,5 +308,87 @@ public class PaymentsController {
             log.error("Invalid date format for vehicle performance request, vehicleId={}", vehicleId, ex);
             return ResponseEntity.badRequest().build();
         }
+    }
+
+    @GetMapping("/owners/{ownerId}/earnings/movements")
+    @PreAuthorize("hasRole('USER')")
+    @Operation(summary = "Get owner earnings movements", description = "Returns itemized payment records for an owner within an optional date range (US47/TS12).")
+    public ResponseEntity<List<EarningsMovementResource>> getOwnerEarningsMovements(
+            @PathVariable @Positive(message = "Owner ID must be positive") Long ownerId,
+            @RequestParam(required = false) String from,
+            @RequestParam(required = false) String to) {
+        if (!currentUserService.isOwnerOrAdmin(ownerId)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+        }
+        try {
+            LocalDateTime fromDate = (from != null && !from.isBlank())
+                    ? LocalDate.parse(from).atStartOfDay()
+                    : LocalDateTime.of(2000, 1, 1, 0, 0);
+            LocalDateTime toDate = (to != null && !to.isBlank())
+                    ? LocalDate.parse(to).atTime(23, 59, 59)
+                    : LocalDateTime.now();
+            if (fromDate.isAfter(toDate)) {
+                return ResponseEntity.badRequest().build();
+            }
+
+            var movements = paymentsService.findAllByOwnerBetween(ownerId, fromDate, toDate).stream()
+                    .map(p -> {
+                        var m = new EarningsMovementResource();
+                        m.setReservationId(p.getReservationId());
+                        m.setAmountCents(p.getAmountCents());
+                        m.setStatus(p.getStatus());
+                        m.setCreatedAt(p.getCreatedAt() == null ? null : p.getCreatedAt().toString());
+                        return m;
+                    })
+                    .toList();
+            return ResponseEntity.ok(movements);
+        } catch (DateTimeParseException ex) {
+            return ResponseEntity.badRequest().build();
+        }
+    }
+
+    @PostMapping("/owners/{ownerId}/withdrawals")
+    @PreAuthorize("hasRole('USER')")
+    @Operation(summary = "Request withdrawal", description = "Requests a payout withdrawal for an owner against their currently available balance (US48/US49).")
+    public ResponseEntity<WithdrawalResource> requestWithdrawal(
+            @PathVariable @Positive(message = "Owner ID must be positive") Long ownerId,
+            @Valid @RequestBody CreateWithdrawalRequest request) {
+        if (!currentUserService.isOwnerOrAdmin(ownerId)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+        }
+        try {
+            var withdrawal = withdrawalService.requestWithdrawal(ownerId, request.getAmountCents(), request.getPayoutDestinationNote());
+            var resource = toWithdrawalResource(withdrawal);
+            return ResponseEntity.created(URI.create("/api/v1/payments/owners/" + ownerId + "/withdrawals/" + withdrawal.getId()))
+                    .body(resource);
+        } catch (IllegalArgumentException ex) {
+            return ResponseEntity.badRequest().build();
+        }
+    }
+
+    @GetMapping("/owners/{ownerId}/withdrawals")
+    @PreAuthorize("hasRole('USER')")
+    @Operation(summary = "Get withdrawal history", description = "Returns the owner's paginated withdrawal request history (US49). Page starts at 1.")
+    public ResponseEntity<PagedResponse<WithdrawalResource>> getWithdrawalHistory(
+            @PathVariable @Positive(message = "Owner ID must be positive") Long ownerId,
+            @RequestParam(defaultValue = "1") @Min(value = 1, message = "Page must be greater than or equal to 1") int page,
+            @RequestParam(defaultValue = "20") @Min(value = 1, message = "Size must be greater than 0") @Max(value = 100, message = "Size must be at most 100") int size) {
+        if (!currentUserService.isOwnerOrAdmin(ownerId)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+        }
+        var results = withdrawalService.getWithdrawalHistory(ownerId, page - 1, size);
+        var content = results.getContent().stream().map(this::toWithdrawalResource).toList();
+        return ResponseEntity.ok(new PagedResponse<>(content, page, size, results.getTotalElements(), results.getTotalPages()));
+    }
+
+    private WithdrawalResource toWithdrawalResource(app.web.rtgtechnologies.rent2go.payments.domain.model.entities.Withdrawal withdrawal) {
+        var resource = new WithdrawalResource();
+        resource.setId(withdrawal.getId());
+        resource.setOwnerId(withdrawal.getOwnerId());
+        resource.setAmountCents(withdrawal.getAmountCents());
+        resource.setPayoutDestinationNote(withdrawal.getPayoutDestinationNote());
+        resource.setStatus(withdrawal.getStatus() == null ? null : withdrawal.getStatus().name());
+        resource.setRequestedAt(withdrawal.getRequestedAt() == null ? null : withdrawal.getRequestedAt().toString());
+        return resource;
     }
 }

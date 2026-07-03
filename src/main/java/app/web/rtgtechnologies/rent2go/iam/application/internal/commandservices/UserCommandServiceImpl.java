@@ -1,5 +1,7 @@
 package app.web.rtgtechnologies.rent2go.iam.application.internal.commandservices;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -25,6 +27,8 @@ import java.util.UUID;
 @Service
 @Transactional
 public class UserCommandServiceImpl implements UserCommandService {
+
+    private static final Logger log = LoggerFactory.getLogger(UserCommandServiceImpl.class);
 
     private final UserRepository userRepository;
     private final JwtTokenProvider jwtTokenProvider;
@@ -97,7 +101,16 @@ public class UserCommandServiceImpl implements UserCommandService {
                 token, savedUser.getId(), expiresAt, now
         );
         emailVerificationTokenRepository.save(verificationToken);
-        emailService.sendVerificationEmail(savedUser.getEmail().getValue(), token);
+
+        // Email delivery is a best-effort side effect and must never fail registration itself
+        // (e.g. a misconfigured/unavailable email provider must not turn a valid signup into a 500).
+        // Applies uniformly to every AccountType (OWNER, RENTER, BOTH, ADMIN) since this path is role-agnostic.
+        try {
+            emailService.sendVerificationEmail(savedUser.getEmail().getValue(), token);
+        } catch (RuntimeException e) {
+            log.error("Registration succeeded for userId={} but verification email failed to send: {}",
+                    savedUser.getId(), e.getMessage(), e);
+        }
 
         return savedUser.getId();
     }

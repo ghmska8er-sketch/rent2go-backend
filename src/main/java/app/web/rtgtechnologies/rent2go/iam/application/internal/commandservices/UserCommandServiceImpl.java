@@ -182,6 +182,35 @@ public class UserCommandServiceImpl implements UserCommandService {
     }
 
     @Override
+    public void handle(app.web.rtgtechnologies.rent2go.iam.domain.model.commands.ResendVerificationCommand command) {
+        User user = userRepository.findById(command.userId())
+                .orElseThrow(() -> new IllegalArgumentException("User not found: " + command.userId()));
+
+        // Remove any existing token for the user, mirroring RequestPasswordResetCommand's
+        // delete-then-recreate shape exactly. Allowed even if already verified: resending
+        // does not un-verify anything, so it's a harmless no-op from the account's perspective.
+        emailVerificationTokenRepository.deleteByUserId(user.getId());
+
+        String token = UUID.randomUUID().toString();
+        Instant now = Instant.now();
+        Instant expiresAt = now.plus(24, ChronoUnit.HOURS);
+        var verificationToken = new app.web.rtgtechnologies.rent2go.iam.infrastructure.persistence.jpa.entities.EmailVerificationToken(
+                token, user.getId(), expiresAt, now
+        );
+        emailVerificationTokenRepository.save(verificationToken);
+
+        // Email delivery is a best-effort side effect and must never fail the resend request
+        // itself — the new token now exists regardless of whether the send succeeds, matching
+        // the same try/catch pattern used at registration.
+        try {
+            emailService.sendVerificationEmail(user.getEmail().getValue(), token);
+        } catch (RuntimeException e) {
+            log.error("Resend requested for userId={} but verification email failed to send: {}",
+                    user.getId(), e.getMessage(), e);
+        }
+    }
+
+    @Override
     public Long handle(app.web.rtgtechnologies.rent2go.iam.domain.model.commands.SubmitKycCommand command) {
         var user = userRepository.findById(command.userId())
                 .orElseThrow(() -> new IllegalArgumentException("User not found: " + command.userId()));

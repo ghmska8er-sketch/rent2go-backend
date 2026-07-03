@@ -8,9 +8,19 @@ import app.web.rtgtechnologies.rent2go.iam.domain.model.valueobjects.Username;
 import app.web.rtgtechnologies.rent2go.shared.domain.model.aggregates.AuditableAbstractAggregateRoot;
 import jakarta.persistence.*;
 
+import java.util.regex.Pattern;
+
 @Entity
 @Table(name = "users")
 public class User extends AuditableAbstractAggregateRoot<User> {
+
+    /**
+     * Peru mobile number format: exactly 9 digits, starting with 9, no country code prefix
+     * (e.g. "932400537"). phone_verified is a rule-based FORMAT/PRESENCE check only — it does
+     * NOT prove proof-of-possession (no SMS/OTP). Recomputed automatically whenever phone is
+     * set/cleared via setPhone(), so it can never drift from the actual phone value.
+     */
+    private static final Pattern PERU_MOBILE_PATTERN = Pattern.compile("^9\\d{8}$");
 
     @Embedded
     @AttributeOverride(name = "value", column = @Column(name = "email", nullable = false, unique = true, length = 255))
@@ -26,7 +36,7 @@ public class User extends AuditableAbstractAggregateRoot<User> {
     @Column(name = "full_name", nullable = false, length = 150)
     private String fullName;
 
-    @Column(name = "phone", nullable = false, length = 20)
+    @Column(name = "phone", length = 20)
     private String phone;
 
     @Column(name = "profile_image_url", length = 500)
@@ -65,7 +75,7 @@ public class User extends AuditableAbstractAggregateRoot<User> {
         this.accountType = accountType;
         this.status = UserStatus.PENDING_VERIFICATION;
         this.emailVerified = false;
-        this.phoneVerified = false;
+        this.phoneVerified = computePhoneVerified(phone);
         this.twoFactorEnabled = false;
         this.kycVerified = false;
     }
@@ -106,8 +116,24 @@ public class User extends AuditableAbstractAggregateRoot<User> {
         return phone;
     }
 
+    /**
+     * Sets the phone number and recomputes phone_verified in the same step, so the two
+     * fields can never drift out of sync (a manual "verify" action does not apply here —
+     * this is a rule-based format/presence check, not an SMS/OTP proof-of-possession flow).
+     * Covers registration, profile update (PATCH /auth/me), and clearing the phone (null/blank).
+     */
     public void setPhone(String phone) {
         this.phone = phone;
+        this.phoneVerified = computePhoneVerified(phone);
+    }
+
+    /**
+     * Peru mobile format/presence validation only (no SMS/OTP): true when phone is present
+     * and matches 9XXXXXXXX (9 digits, starts with 9); false when missing, cleared, or malformed
+     * (wrong length, non-digit characters, doesn't start with 9).
+     */
+    private static boolean computePhoneVerified(String phone) {
+        return phone != null && PERU_MOBILE_PATTERN.matcher(phone.trim()).matches();
     }
 
     public String getProfileImageUrl() {
@@ -142,12 +168,13 @@ public class User extends AuditableAbstractAggregateRoot<User> {
         this.emailVerified = emailVerified;
     }
 
+    /**
+     * phone_verified is computed (see setPhone()/computePhoneVerified()) and intentionally has
+     * no public setter — it must never be set independently of the phone value, or it could
+     * drift out of sync. Callers should update phone via setPhone(); this flag follows automatically.
+     */
     public Boolean getPhoneVerified() {
         return phoneVerified;
-    }
-
-    public void setPhoneVerified(Boolean phoneVerified) {
-        this.phoneVerified = phoneVerified;
     }
 
     public Boolean getTwoFactorEnabled() {

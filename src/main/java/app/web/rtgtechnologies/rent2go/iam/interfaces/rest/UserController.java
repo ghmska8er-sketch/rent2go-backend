@@ -79,6 +79,24 @@ public class UserController {
         }
     }
 
+    @PostMapping("/verify/resend")
+    @Operation(summary = "Resend verification email", description = "Issues a new email verification token for the authenticated user and re-sends the verification email (best-effort).")
+    public ResponseEntity<Void> resendVerification(@RequestHeader(value = "Authorization", required = false) String authHeader) {
+        try {
+            if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+            }
+
+            String token = authHeader.substring(7);
+            Long userId = userQueryService.handle(new app.web.rtgtechnologies.rent2go.iam.domain.model.queries.ValidateTokenQuery(token));
+
+            userCommandService.handle(new app.web.rtgtechnologies.rent2go.iam.domain.model.commands.ResendVerificationCommand(userId));
+            return ResponseEntity.ok().build();
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
+    }
+
     @PostMapping("/password/request")
     @Operation(summary = "Request password reset", description = "Starts the password recovery flow by sending a reset token to the user's email. The token is also returned in the response for testing purposes.")
     public ResponseEntity<PasswordResetResponseResource> requestPasswordReset(@Valid @RequestBody PasswordResetRequestResource resource) {
@@ -206,7 +224,7 @@ public class UserController {
     @PreAuthorize("hasRole('USER')")
     @Operation(summary = "Update profile (multipart)",
                description = "Updates the authenticated user's profile. All fields are optional; only provided fields are changed.")
-    public ResponseEntity<UserResource> updateProfile(
+    public ResponseEntity<?> updateProfile(
             @RequestHeader(value = "Authorization") String authHeader,
             @RequestParam(required = false) String fullName,
             @RequestParam(required = false) String phone,
@@ -222,7 +240,11 @@ public class UserController {
                     .orElseThrow(() -> new IllegalArgumentException("User not found"));
 
             if (fullName != null && !fullName.isBlank()) user.setFullName(fullName);
-            if (phone != null && !phone.isBlank()) user.setPhone(phone);
+            // phone absent (null) -> untouched; phone present but blank -> explicit clear
+            // (phone_verified is recomputed automatically inside setPhone(), including on clear).
+            if (phone != null) {
+                user.setPhone(phone.isBlank() ? null : phone);
+            }
             if (profileImage != null && !profileImage.isEmpty()) {
                 String imageUrl = cloudinaryStorageService.upload(profileImage);
                 user.setProfileImageUrl(imageUrl);
@@ -232,8 +254,26 @@ public class UserController {
             return ResponseEntity.ok(userResourceAssembler.toResourceFromEntity(user));
         } catch (IllegalArgumentException e) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        } catch (java.io.IOException e) {
+            // Image upload (Cloudinary) failed. Previously this fell into the generic
+            // catch below and returned a bodyless 500, which the Flutter client's
+            // _extractMessage() could not parse into anything useful — the user just
+            // saw a generic "no se pudo actualizar el perfil" with no real signal.
+            // Logging here + returning a JSON error body lets the client surface the
+            // actual reason (e.g. server misconfiguration) instead of failing silently.
+            org.slf4j.LoggerFactory.getLogger(UserController.class)
+                    .error("Profile image upload failed for PATCH /auth/me", e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(java.util.Map.of(
+                            "error", "Image upload failed",
+                            "message", "No se pudo subir la foto de perfil. Intenta nuevamente en unos minutos."));
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+            org.slf4j.LoggerFactory.getLogger(UserController.class)
+                    .error("Unexpected error updating profile via PATCH /auth/me", e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(java.util.Map.of(
+                            "error", "Internal server error",
+                            "message", "No se pudo actualizar el perfil."));
         }
     }
 

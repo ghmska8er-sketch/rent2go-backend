@@ -7,10 +7,17 @@ import com.resend.services.emails.model.CreateEmailResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.context.annotation.Primary;
 import org.springframework.stereotype.Service;
 
-@Primary
+/**
+ * Legacy Resend-based implementation of {@link EmailService}.
+ * <p>
+ * Kept in the codebase for reference/rollback only — it is NO LONGER the active
+ * {@code @Primary} implementation. {@link BrevoEmailService} is now primary as of
+ * the Resend-to-Brevo migration. To roll back, remove {@code @Primary} from
+ * {@link BrevoEmailService} and re-add it here; no call sites need to change
+ * either way since callers depend only on the {@link EmailService} interface.
+ */
 @Service
 public class ResendEmailService implements EmailService {
 

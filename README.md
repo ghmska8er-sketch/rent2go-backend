@@ -74,6 +74,33 @@ Required environment variables:
 - `DB_USERNAME`
 - `DB_PASSWORD`
 - `JWT_SECRET`
+- `CLOUDINARY_CLOUD_NAME`
+- `CLOUDINARY_UPLOAD_PRESET`
+- `BREVO_API_KEY`
+- `BREVO_FROM_EMAIL`
+
+> **Note:** `RESEND_API_KEY` / `RESEND_FROM_EMAIL` are no longer used. Brevo
+> (`BrevoEmailService`) is now the `@Primary` transactional email provider as of
+> the Resend-to-Brevo migration; `ResendEmailService` is kept in the codebase
+> for reference/rollback only and is not wired up. The `resend.*` properties
+> entries were intentionally left in `application.properties` (unused) rather
+> than deleted, to keep the rollback path a one-line `@Primary` annotation move.
+
+> **Note:** `CLOUDINARY_CLOUD_NAME` / `CLOUDINARY_UPLOAD_PRESET` are also required
+> for local `dev` runs whenever a feature uploads an image (profile photo, KYC
+> documents, vehicle photos, etc.). Without them, `application.properties`
+> falls back to placeholder values (`your_cloud_name` / `your_upload_preset`)
+> and every image upload endpoint (e.g. `PATCH /api/v1/auth/me`) fails with a
+> 500 error — this previously surfaced to end users as "changing the profile
+> photo silently does nothing." Get real values from the project's Cloudinary
+> dashboard (Settings → Upload → Upload presets for the preset name, and the
+> account dashboard for the cloud name), then export them before starting the
+> app, e.g.:
+>
+> ```bash
+> export CLOUDINARY_CLOUD_NAME="your-real-cloud-name"
+> export CLOUDINARY_UPLOAD_PRESET="your-real-unsigned-preset"
+> ```
 
 Example:
 
@@ -82,6 +109,10 @@ export DB_URL="jdbc:mysql://your-host:3306/rent2go_db"
 export DB_USERNAME="your-user"
 export DB_PASSWORD="your-password"
 export JWT_SECRET="your-secret-key"
+export CLOUDINARY_CLOUD_NAME="your-real-cloud-name"
+export CLOUDINARY_UPLOAD_PRESET="your-real-unsigned-preset"
+export BREVO_API_KEY="your-real-brevo-api-key"
+export BREVO_FROM_EMAIL="noreply@yourdomain.com"
 
 java -jar target/rent2go-0.0.1-SNAPSHOT.jar --spring.profiles.active=prod
 ```

@@ -115,7 +115,9 @@
             <version>22.14.0</version>
         </dependency>
 
-        <!-- Resend Email SDK -->
+        <!-- Resend Email SDK (LEGACY - kept only so ResendEmailService.java still compiles
+             for rollback purposes; Brevo is now the active provider and needs no SDK,
+             it uses the JDK HttpClient + Jackson, both already available transitively). -->
         <dependency>
             <groupId>com.resend</groupId>
             <artifactId>resend-java</artifactId>

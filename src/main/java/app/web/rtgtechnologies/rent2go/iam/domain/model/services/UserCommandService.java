@@ -5,11 +5,13 @@ import app.web.rtgtechnologies.rent2go.iam.domain.model.commands.RegisterUserCom
 import app.web.rtgtechnologies.rent2go.iam.domain.model.commands.VerifyEmailCommand;
 import app.web.rtgtechnologies.rent2go.iam.domain.model.commands.RequestPasswordResetCommand;
 import app.web.rtgtechnologies.rent2go.iam.domain.model.commands.ResetPasswordCommand;
+import app.web.rtgtechnologies.rent2go.iam.domain.model.commands.ResendVerificationCommand;
 
 public interface UserCommandService {
     Long handle(RegisterUserCommand command);
     String handle(LoginCommand command);
     void handle(VerifyEmailCommand command);
+    void handle(ResendVerificationCommand command);
     Long handle(app.web.rtgtechnologies.rent2go.iam.domain.model.commands.SubmitKycCommand command);
     String initiateTwoFactorLogin(String email);
     void confirmEnableTwoFactor(String token);

@@ -1,20 +1,34 @@
 package app.web.rtgtechnologies.rent2go.booking_reservations.application.internal.services;
 
 import app.web.rtgtechnologies.rent2go.booking_reservations.domain.model.services.NotificationService;
+import app.web.rtgtechnologies.rent2go.notifications.application.internal.commandservices.NotificationCommandServiceImpl;
+import app.web.rtgtechnologies.rent2go.notifications.domain.model.commands.CreateNotificationCommand;
 import app.web.rtgtechnologies.rent2go.notifications.infrastructure.persistence.jpa.repositories.DeviceTokenRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
+/**
+ * NotificationServiceImpl
+ *
+ * TS11/US50-52 (Phase 4): in addition to the existing device-token push-log placeholder,
+ * every dispatch now also persists a real, listable in-app {@code Notification} row via
+ * NotificationCommandServiceImpl, so a reservation lifecycle event (created/status-changed/
+ * cancelled) is visible through GET /api/v1/notifications/users/{userId} without requiring
+ * real FCM/APNs push (per SP05's in-app-only decision,
+ * docs/spikes/SP05-push-notification-scope.md).
+ */
 @Service
 public class NotificationServiceImpl implements NotificationService {
 
     private static final Logger log = LoggerFactory.getLogger(NotificationServiceImpl.class);
 
     private final DeviceTokenRepository deviceTokenRepository;
+    private final NotificationCommandServiceImpl notificationCommandService;
 
-    public NotificationServiceImpl(DeviceTokenRepository deviceTokenRepository) {
+    public NotificationServiceImpl(DeviceTokenRepository deviceTokenRepository, NotificationCommandServiceImpl notificationCommandService) {
         this.deviceTokenRepository = deviceTokenRepository;
+        this.notificationCommandService = notificationCommandService;
     }
 
     @Override
@@ -41,6 +55,13 @@ public class NotificationServiceImpl implements NotificationService {
     private void dispatch(Long userId, String title, String message) {
         if (userId == null) {
             return;
+        }
+
+        try {
+            notificationCommandService.handle(new CreateNotificationCommand(userId, "RESERVATION", message));
+        } catch (Exception ex) {
+            // In-app notification creation must never break the reservation flow.
+            log.error("[Notification] Failed to persist in-app notification for user {}", userId, ex);
         }
 
         var tokens = deviceTokenRepository.findAllByUserIdAndEnabledTrueOrderByCreatedAtDesc(userId);

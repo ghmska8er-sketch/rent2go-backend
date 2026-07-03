@@ -12,4 +12,10 @@ public interface TrustReportRepository extends JpaRepository<TrustReport, Long> 
     List<TrustReport> findAllByReportedUserIdOrderByCreatedAtDesc(Long reportedUserId);
 
     List<TrustReport> findAllByReviewId(Long reviewId);
+
+    /**
+     * US42: self-service dispute-status query — returns the reports/disputes a given user
+     * has themselves filed, most recent first.
+     */
+    List<TrustReport> findAllByReporterIdOrderByCreatedAtDesc(Long reporterId);
 }

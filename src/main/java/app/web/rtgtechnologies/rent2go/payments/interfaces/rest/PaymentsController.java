@@ -197,14 +197,15 @@ public class PaymentsController {
     public ResponseEntity<String> webhook(@RequestBody String payload, @RequestHeader("Stripe-Signature") String sigHeader) {
         try {
             var event = stripePaymentService.constructEvent(payload, sigHeader);
+            // handleWebhookEvent now owns applying ALL payment_intent.succeeded side effects
+            // (both confirming the Reservation and marking the Payment record SUCCEEDED) from a
+            // single, safely-deserialized PaymentIntent — see StripePaymentService.applyPaymentSucceeded.
+            // Previously this method independently re-deserialized the event here via
+            // getObject().orElse(null) just to update Payment.status; that second deserialization
+            // could silently return empty on a Stripe API-version mismatch even when the first
+            // deserialization (inside handleWebhookEvent) succeeded, leaving Payment.status stuck
+            // at CREATED despite the Reservation being confirmed correctly.
             stripePaymentService.handleWebhookEvent(event);
-            // mark payment record succeeded when applicable
-            if ("payment_intent.succeeded".equals(event.getType())) {
-                var pi = (com.stripe.model.PaymentIntent) event.getDataObjectDeserializer().getObject().orElse(null);
-                if (pi != null) {
-                    paymentsService.markSucceeded(pi.getId());
-                }
-            }
             return ResponseEntity.ok("received");
         } catch (Exception ex) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("invalid payload");

@@ -34,12 +34,15 @@ public class StripePaymentService {
 
     private final ReservationRepository reservationRepository;
     private final VehicleAvailabilityRepository availabilityRepository;
+    private final PaymentsService paymentsService;
 
     public StripePaymentService(
             ReservationRepository reservationRepository,
-            VehicleAvailabilityRepository availabilityRepository) {
+            VehicleAvailabilityRepository availabilityRepository,
+            PaymentsService paymentsService) {
         this.reservationRepository = reservationRepository;
         this.availabilityRepository = availabilityRepository;
+        this.paymentsService = paymentsService;
     }
 
     public Map<String, Object> createPaymentIntent(Long reservationId, Long amountCents, String currency) throws StripeException {
@@ -67,14 +70,46 @@ public class StripePaymentService {
         log.info("Received Stripe event: {}", event.getType());
         switch (event.getType()) {
             case "payment_intent.succeeded" -> {
-                PaymentIntent intent = (PaymentIntent) event.getDataObjectDeserializer().getObject().orElse(null);
+                PaymentIntent intent = deserializePaymentIntent(event);
                 if (intent != null) {
                     log.info("PaymentIntent succeeded: {} metadata: {}", intent.getId(), intent.getMetadata());
                     handlePaymentSucceeded(intent);
+                } else {
+                    log.warn("payment_intent.succeeded event (id={}) could not be deserialized to a PaymentIntent " +
+                            "even via deserializeUnsafe() fallback — likely a malformed payload. No side effects applied.",
+                            event.getId());
                 }
             }
             case "charge.refunded" -> log.info("Charge refunded event received: {}", event.getData());
             default -> log.info("Unhandled event type: {}", event.getType());
+        }
+    }
+
+    /**
+     * Deserializes the event's data object to a {@link PaymentIntent}.
+     *
+     * <p>{@code EventDataObjectDeserializer.getObject()} silently returns {@link Optional#empty()}
+     * (no exception) whenever the event's embedded {@code api_version} does not match the
+     * {@code stripe-java} SDK version this service is compiled against — a common real-world
+     * mismatch when the Stripe account/webhook is configured with a newer API version than the
+     * pinned SDK. Previously, both the reservation-confirm path (here) and the payment-record
+     * status update (formerly a second, independent {@code getObject()} call in
+     * {@code PaymentsController.webhook()}) relied on this fragile call, so a version mismatch
+     * would silently no-op status updates. Stripe's own docs recommend {@code deserializeUnsafe()}
+     * as the fallback for exactly this case, since it deserializes directly from the raw JSON
+     * without the version-matching guard.
+     */
+    private PaymentIntent deserializePaymentIntent(Event event) {
+        var deserializer = event.getDataObjectDeserializer();
+        var obj = deserializer.getObject();
+        if (obj.isPresent()) {
+            return (PaymentIntent) obj.get();
+        }
+        try {
+            return (PaymentIntent) deserializer.deserializeUnsafe();
+        } catch (Exception ex) {
+            log.warn("deserializeUnsafe() fallback failed for event {}: {}", event.getId(), ex.getMessage());
+            return null;
         }
     }
 
@@ -123,6 +158,11 @@ public class StripePaymentService {
 
         // Auto-block vehicle availability for reservation dates
         blockVehicleDatesForReservation(reservation);
+
+        // Mark the Payment record succeeded in the same place/transaction as the reservation
+        // update, using the exact same (safely-deserialized) intent id — eliminates the previous
+        // duplicate, independent deserialization that used to live in PaymentsController.webhook().
+        paymentsService.markSucceeded(intent.getId());
     }
 
     /**

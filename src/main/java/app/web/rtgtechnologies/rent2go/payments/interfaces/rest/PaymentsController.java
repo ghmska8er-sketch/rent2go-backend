@@ -179,12 +179,15 @@ public class PaymentsController {
     @PreAuthorize("hasRole('USER')")
     @Operation(summary = "Create payment intent", description = "Creates a Stripe payment intent for a reservation and stores the payment record.")
     public ResponseEntity<CreateIntentResponse> createIntent(@Valid @RequestBody CreateIntentRequest request) {
+        log.info("POST create-intent: reservationId={}, amountCents={}, currency={}",
+                request.getReservationId(), request.getAmountCents(), request.getCurrency());
         try {
             var map = stripePaymentService.createPaymentIntent(request.getReservationId(), request.getAmountCents(), request.getCurrency());
             // persist payment record
             paymentsService.createRecord(request.getReservationId(), (String) map.get("id"), request.getAmountCents(), request.getCurrency());
             return ResponseEntity.ok(new CreateIntentResponse((String) map.get("clientSecret"), (String) map.get("id")));
         } catch (StripeException e) {
+            log.error("Stripe rejected create-intent for reservationId={}: {}", request.getReservationId(), e.getMessage(), e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
         }
     }
@@ -194,18 +197,58 @@ public class PaymentsController {
     public ResponseEntity<String> webhook(@RequestBody String payload, @RequestHeader("Stripe-Signature") String sigHeader) {
         try {
             var event = stripePaymentService.constructEvent(payload, sigHeader);
+            // handleWebhookEvent now owns applying ALL payment_intent.succeeded side effects
+            // (both confirming the Reservation and marking the Payment record SUCCEEDED) from a
+            // single, safely-deserialized PaymentIntent — see StripePaymentService.applyPaymentSucceeded.
+            // Previously this method independently re-deserialized the event here via
+            // getObject().orElse(null) just to update Payment.status; that second deserialization
+            // could silently return empty on a Stripe API-version mismatch even when the first
+            // deserialization (inside handleWebhookEvent) succeeded, leaving Payment.status stuck
+            // at CREATED despite the Reservation being confirmed correctly.
             stripePaymentService.handleWebhookEvent(event);
-            // mark payment record succeeded when applicable
-            if ("payment_intent.succeeded".equals(event.getType())) {
-                var pi = (com.stripe.model.PaymentIntent) event.getDataObjectDeserializer().getObject().orElse(null);
-                if (pi != null) {
-                    paymentsService.markSucceeded(pi.getId());
-                }
-            }
             return ResponseEntity.ok("received");
         } catch (Exception ex) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("invalid payload");
         }
+    }
+
+    @PostMapping("/reservations/{reservationId}/sync")
+    @PreAuthorize("hasRole('USER')")
+    @Operation(summary = "Sync payment status with Stripe",
+               description = "Defensive fallback for when the Stripe webhook has not (yet) reached the backend " +
+                             "(e.g. webhook not registered in the Stripe Dashboard, or misconfigured signing secret " +
+                             "in this environment). Retrieves the reservation's PaymentIntent directly from Stripe " +
+                             "and, if it reports 'succeeded', applies the same confirm/mark-paid logic the webhook " +
+                             "would have applied. The webhook remains the source of truth; this only unblocks a " +
+                             "reservation stuck in PENDING after a genuinely successful charge.")
+    public ResponseEntity<app.web.rtgtechnologies.rent2go.payments.interfaces.rest.resources.PaymentReceiptResource> syncPayment(
+            @PathVariable Long reservationId) {
+        var opt = paymentsService.findByReservationId(reservationId);
+        if (opt.isEmpty()) {
+            return ResponseEntity.notFound().build();
+        }
+        var payment = opt.get();
+        try {
+            boolean succeeded = stripePaymentService.syncPaymentIntent(payment.getPaymentIntentId());
+            if (succeeded) {
+                paymentsService.markSucceeded(payment.getPaymentIntentId());
+            }
+        } catch (StripeException e) {
+            log.error("Stripe rejected sync for reservationId={}, paymentIntentId={}: {}",
+                    reservationId, payment.getPaymentIntentId(), e.getMessage(), e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
+
+        // Return the up-to-date receipt (re-read after the potential sync above)
+        var refreshed = paymentsService.findByReservationId(reservationId).orElse(payment);
+        var r = new app.web.rtgtechnologies.rent2go.payments.interfaces.rest.resources.PaymentReceiptResource();
+        r.setPaymentIntentId(refreshed.getPaymentIntentId());
+        r.setAmountCents(refreshed.getAmountCents());
+        r.setCurrency(refreshed.getCurrency());
+        r.setStatus(refreshed.getStatus());
+        r.setCreatedAt(refreshed.getCreatedAt());
+        r.setUpdatedAt(refreshed.getUpdatedAt());
+        return ResponseEntity.ok(r);
     }
 
     @PostMapping("/refund")

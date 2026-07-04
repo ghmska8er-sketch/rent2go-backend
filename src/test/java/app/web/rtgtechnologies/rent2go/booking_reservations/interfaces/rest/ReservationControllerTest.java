@@ -2,7 +2,9 @@ package app.web.rtgtechnologies.rent2go.booking_reservations.interfaces.rest;
 
 import app.web.rtgtechnologies.rent2go.booking_reservations.application.internal.commandservices.ReservationCommandServiceImpl;
 import app.web.rtgtechnologies.rent2go.booking_reservations.application.internal.queryservices.ReservationQueryServiceImpl;
+import app.web.rtgtechnologies.rent2go.booking_reservations.domain.model.aggregates.Reservation;
 import app.web.rtgtechnologies.rent2go.booking_reservations.domain.model.commands.UpdateReservationStatusCommand;
+import app.web.rtgtechnologies.rent2go.booking_reservations.domain.model.queries.GetReservationByIdQuery;
 import app.web.rtgtechnologies.rent2go.booking_reservations.interfaces.rest.assemblers.CancelReservationCommandFromResourceAssembler;
 import app.web.rtgtechnologies.rent2go.booking_reservations.interfaces.rest.assemblers.ConfirmReturnCommandFromResourceAssembler;
 import app.web.rtgtechnologies.rent2go.booking_reservations.interfaces.rest.assemblers.CreateReservationCommandFromResourceAssembler;
@@ -16,7 +18,10 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.util.Optional;
+
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 
 /**
@@ -110,5 +115,31 @@ class ReservationControllerTest {
         var response = controller.updateReservationStatus(10L, resource);
 
         assertEquals(200, response.getStatusCode().value());
+    }
+
+    /**
+     * Issue 4 (business-rule enforcement, owner delivery flow): the owner must not be able to
+     * mark a vehicle as delivered/activated while the reservation is still PENDING (unpaid) —
+     * confirms Reservation.activate()'s existing "must be confirmed before activation" guard
+     * (Reservation.java) is correctly surfaced by POST /reservations/{id}/activate as 400 Bad
+     * Request, not silently succeeding or 500ing. This was found ALREADY correctly implemented
+     * on the domain aggregate; this test closes the previously-missing regression coverage for
+     * the controller's handling of that guard on this specific endpoint.
+     */
+    @Test
+    void activateReservation_returnsBadRequest_whenReservationIsStillPending() {
+        var pendingReservation = org.mockito.Mockito.mock(Reservation.class);
+        when(pendingReservation.getOwnerId()).thenReturn(5L);
+        when(queryService.handle(any(GetReservationByIdQuery.class))).thenReturn(Optional.of(pendingReservation));
+
+        var command = new UpdateReservationStatusCommand(10L, 5L, "ACTIVE");
+        when(updateStatusAssembler.toCommand(org.mockito.ArgumentMatchers.eq(10L), any(UpdateReservationStatusResource.class)))
+                .thenReturn(command);
+        when(commandService.handle(command))
+                .thenThrow(new IllegalStateException("Reservation must be confirmed before activation"));
+
+        var response = controller.activateReservation(10L);
+
+        assertEquals(400, response.getStatusCode().value());
     }
 }

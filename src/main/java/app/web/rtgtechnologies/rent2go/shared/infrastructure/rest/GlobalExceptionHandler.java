@@ -14,6 +14,8 @@ import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExcep
 
 import jakarta.validation.ConstraintViolationException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.HashMap;
 import java.util.List;
@@ -23,29 +25,42 @@ import java.util.stream.Collectors;
 @ControllerAdvice
 public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
 
+    private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
+
+    // Issue 1 (Kotlin create-intent HTTP 422 investigation): this handler previously returned
+    // the validation-error detail in the response body but never logged it server-side, so a
+    // client-reported 422 could not be correlated with a specific request/field from server logs
+    // alone. Every 422 is now logged at WARN with the offending path + field/message pairs.
     @Override
     protected ResponseEntity<Object> handleMethodArgumentNotValid(MethodArgumentNotValidException ex,
                                                                   HttpHeaders headers,
                                                                   HttpStatusCode status,
                                                                   WebRequest request) {
+        List<Map<String, String>> errors = ex.getBindingResult().getFieldErrors().stream()
+                .map(error -> Map.of(
+                        "field", error.getField(),
+                        "message", error.getDefaultMessage() == null ? "" : error.getDefaultMessage(),
+                        "rejectedValue", String.valueOf(error.getRejectedValue())))
+                .collect(Collectors.toList());
+        log.warn("422 Unprocessable Entity on {}: {}", request.getDescription(false), errors);
         return ResponseEntity.status(HttpStatus.UNPROCESSABLE_ENTITY).body(validationBody(
             "Validation failed",
-            ex.getBindingResult().getFieldErrors().stream()
-                .map(error -> Map.of("field", error.getField(), "message", error.getDefaultMessage()))
-                .collect(Collectors.toList())
+            errors
         ));
     }
 
     @ExceptionHandler(ConstraintViolationException.class)
     public ResponseEntity<Object> handleConstraintViolation(ConstraintViolationException ex) {
-        return ResponseEntity.status(HttpStatus.UNPROCESSABLE_ENTITY).body(validationBody(
-            "Validation failed",
-            ex.getConstraintViolations().stream()
+        List<Map<String, String>> errors = ex.getConstraintViolations().stream()
                 .map(error -> Map.of(
                     "field", error.getPropertyPath().toString(),
                     "message", error.getMessage()
                 ))
-                .collect(Collectors.toList())
+                .collect(Collectors.toList());
+        log.warn("422 Unprocessable Entity (constraint violation): {}", errors);
+        return ResponseEntity.status(HttpStatus.UNPROCESSABLE_ENTITY).body(validationBody(
+            "Validation failed",
+            errors
         ));
     }
 

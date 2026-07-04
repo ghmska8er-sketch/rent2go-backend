@@ -80,40 +80,72 @@ public class StripePaymentService {
 
     private void handlePaymentSucceeded(PaymentIntent intent) {
         try {
-            String reservationIdStr = intent.getMetadata().get("reservationId");
-            if (reservationIdStr == null || reservationIdStr.isBlank()) {
-                log.warn("payment_intent.succeeded received without reservationId in metadata (intentId={})", intent.getId());
-                return;
-            }
-
-            Long reservationId = Long.valueOf(reservationIdStr);
-            Optional<app.web.rtgtechnologies.rent2go.booking_reservations.domain.model.aggregates.Reservation> resOpt =
-                    reservationRepository.findById(reservationId);
-
-            if (resOpt.isEmpty()) {
-                log.warn("Reservation metadata points to non-existent id: {}", reservationId);
-                return;
-            }
-
-            var reservation = resOpt.get();
-
-            // Mark paid + auto-confirm if PENDING (markPaid already calls confirm() internally)
-            if (!reservation.getStatus().isConfirmed() && !reservation.getStatus().isTerminal()) {
-                reservation.markPaid(intent.getId());
-            } else if (reservation.getStatus().isConfirmed()) {
-                // Already confirmed — just record the paymentIntentId if not set
-                log.info("Reservation {} already confirmed, skipping re-confirm", reservationId);
-            }
-
-            reservationRepository.save(reservation);
-            log.info("Reservation {} confirmed and paid (intent={})", reservationId, intent.getId());
-
-            // Auto-block vehicle availability for reservation dates
-            blockVehicleDatesForReservation(reservation);
-
+            applyPaymentSucceeded(intent);
         } catch (Exception ex) {
             log.error("Error handling payment_intent.succeeded webhook: {}", ex.getMessage(), ex);
         }
+    }
+
+    /**
+     * Applies the "payment succeeded" side effects (confirm + mark paid + block availability)
+     * for a given Stripe PaymentIntent. Shared by the webhook handler (source of truth) and by
+     * {@link #syncPaymentIntent(String)}, the defensive fallback used when the webhook has not
+     * (yet) reached the backend — see docs/integracion-stripe.md.
+     */
+    private void applyPaymentSucceeded(PaymentIntent intent) {
+        String reservationIdStr = intent.getMetadata().get("reservationId");
+        if (reservationIdStr == null || reservationIdStr.isBlank()) {
+            log.warn("payment_intent.succeeded received without reservationId in metadata (intentId={})", intent.getId());
+            return;
+        }
+
+        Long reservationId = Long.valueOf(reservationIdStr);
+        Optional<app.web.rtgtechnologies.rent2go.booking_reservations.domain.model.aggregates.Reservation> resOpt =
+                reservationRepository.findById(reservationId);
+
+        if (resOpt.isEmpty()) {
+            log.warn("Reservation metadata points to non-existent id: {}", reservationId);
+            return;
+        }
+
+        var reservation = resOpt.get();
+
+        // Mark paid + auto-confirm if PENDING (markPaid already calls confirm() internally)
+        if (!reservation.getStatus().isConfirmed() && !reservation.getStatus().isTerminal()) {
+            reservation.markPaid(intent.getId());
+        } else if (reservation.getStatus().isConfirmed()) {
+            // Already confirmed — just record the paymentIntentId if not set
+            log.info("Reservation {} already confirmed, skipping re-confirm", reservationId);
+        }
+
+        reservationRepository.save(reservation);
+        log.info("Reservation {} confirmed and paid (intent={})", reservationId, intent.getId());
+
+        // Auto-block vehicle availability for reservation dates
+        blockVehicleDatesForReservation(reservation);
+    }
+
+    /**
+     * Defensive fallback for when the Stripe webhook has not reached the backend (e.g. webhook
+     * not yet registered in the Stripe Dashboard, or misconfigured signing secret). Retrieves the
+     * PaymentIntent directly from Stripe's API and, if it reports "succeeded", applies the exact
+     * same confirm/mark-paid/block-availability logic the webhook would have applied. This does
+     * NOT replace the webhook as the source of truth — it only lets an already-successful charge
+     * unblock a reservation stuck in PENDING when the async notification never arrived.
+     *
+     * @return true if the reservation was found and the PaymentIntent is "succeeded" (i.e. the
+     *         reservation is confirmed/paid as of this call, whether just now or previously).
+     */
+    @Transactional
+    public boolean syncPaymentIntent(String paymentIntentId) throws StripeException {
+        Stripe.apiKey = stripeSecretKey;
+        PaymentIntent intent = PaymentIntent.retrieve(paymentIntentId);
+        if (!"succeeded".equals(intent.getStatus())) {
+            log.info("syncPaymentIntent: intent {} status is '{}', nothing to apply", paymentIntentId, intent.getStatus());
+            return false;
+        }
+        applyPaymentSucceeded(intent);
+        return true;
     }
 
     private void blockVehicleDatesForReservation(

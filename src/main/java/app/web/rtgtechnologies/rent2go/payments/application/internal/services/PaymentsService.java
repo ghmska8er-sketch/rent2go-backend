@@ -55,4 +55,8 @@ public class PaymentsService {
     public Long sumSucceededAmountCentsByVehicleBetween(Long vehicleId, java.time.LocalDateTime from, java.time.LocalDateTime to) {
         return paymentRepository.sumSucceededAmountCentsByVehicleBetween(vehicleId, from, to);
     }
+
+    public java.util.List<Payment> findAllByOwnerBetween(Long ownerId, java.time.LocalDateTime from, java.time.LocalDateTime to) {
+        return paymentRepository.findAllByOwnerBetween(ownerId, from, to);
+    }
 }

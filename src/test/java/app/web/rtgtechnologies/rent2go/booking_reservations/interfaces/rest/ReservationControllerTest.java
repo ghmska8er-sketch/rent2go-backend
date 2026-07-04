@@ -105,7 +105,7 @@ class ReservationControllerTest {
         when(commandService.handle(command)).thenReturn(updatedReservation);
         when(resourceAssembler.toResource(updatedReservation)).thenReturn(
                 new app.web.rtgtechnologies.rent2go.booking_reservations.interfaces.rest.resources.ReservationResource(
-                        10L, "CODE", 1L, 2L, 3L, null, null, null, "CONFIRMED", null, null, null, null, null, null, null, null));
+                        10L, "CODE", 1L, 2L, 3L, null, null, null, "CONFIRMED", null, null, null, null, null, null, null, null, null, null));
 
         var response = controller.updateReservationStatus(10L, resource);
 

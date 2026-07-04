@@ -1,5 +1,8 @@
 package app.web.rtgtechnologies.rent2go.community_trust.interfaces.rest.resources;
 
+import app.web.rtgtechnologies.rent2go.iam.interfaces.rest.resources.CounterpartyResource;
+import com.fasterxml.jackson.annotation.JsonProperty;
+
 public record ConversationResource(
     Long id,
     Long ownerId,
@@ -11,6 +14,11 @@ public record ConversationResource(
     String lastMessageAt,
     String lastMessagePreview,
     String createdAt,
-    String updatedAt
+    String updatedAt,
+    // TS18 — additive nested counterparty objects; ownerId/renterId are kept unchanged above.
+    @JsonProperty("owner")
+    CounterpartyResource owner,
+    @JsonProperty("renter")
+    CounterpartyResource renter
 ) {
 }

@@ -224,6 +224,8 @@ public class VehicleController {
         @RequestParam(required = false) Double centerLongitude,
         @RequestParam(required = false) Double radiusKm,
         @RequestParam(required = false) String featureName,
+        @RequestParam(required = false) @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE) java.time.LocalDate startDate,
+        @RequestParam(required = false) @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE) java.time.LocalDate endDate,
         @RequestParam(defaultValue = "0") @Min(value = 0, message = "Page must be greater than or equal to 0") int page,
         @RequestParam(defaultValue = "20") @Min(value = 1, message = "Size must be greater than 0") @Max(value = 100, message = "Size must be at most 100") int size
     ) {
@@ -240,7 +242,9 @@ public class VehicleController {
             centerLatitude,
             centerLongitude,
             radiusKm,
-            featureName
+            featureName,
+            startDate,
+            endDate
         );
 
         List<Vehicle> vehicles = vehicleQueryService.handle(new SearchVehiclesByCriteriaQuery(criteria));

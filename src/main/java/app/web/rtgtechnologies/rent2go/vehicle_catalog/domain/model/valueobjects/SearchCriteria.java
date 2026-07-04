@@ -6,6 +6,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Objects;
 
@@ -48,6 +49,8 @@ public class SearchCriteria extends ValueObject {
     private Double centerLongitude;
     private Double radiusKm;
     private String featureName;
+    private LocalDate startDate;
+    private LocalDate endDate;
 
     // ========== Factory Methods ==========
 
@@ -56,28 +59,28 @@ public class SearchCriteria extends ValueObject {
      */
     public static SearchCriteria byPriceRange(BigDecimal minPrice, BigDecimal maxPrice) {
         validatePriceRange(minPrice, maxPrice);
-        return new SearchCriteria(null, minPrice, maxPrice, null, null, null, null, null, null, null, null, null, null);
+        return new SearchCriteria(null, minPrice, maxPrice, null, null, null, null, null, null, null, null, null, null, null, null);
     }
 
     /**
      * Create search criteria with categories only.
      */
     public static SearchCriteria byCategories(List<String> categories) {
-        return new SearchCriteria(categories, null, null, null, null, null, null, null, null, null, null, null, null);
+        return new SearchCriteria(categories, null, null, null, null, null, null, null, null, null, null, null, null, null, null);
     }
 
     /**
      * Create search criteria with location only.
      */
     public static SearchCriteria byLocation(String location) {
-        return new SearchCriteria(null, null, null, null, null, null, null, null, location, null, null, null, null);
+        return new SearchCriteria(null, null, null, null, null, null, null, null, location, null, null, null, null, null, null);
     }
 
     /**
      * Create search criteria with geographic radius filter.
      */
     public static SearchCriteria byRadius(Double centerLatitude, Double centerLongitude, Double radiusKm) {
-        return new SearchCriteria(null, null, null, null, null, null, null, null, null, centerLatitude, centerLongitude, radiusKm, null);
+        return new SearchCriteria(null, null, null, null, null, null, null, null, null, centerLatitude, centerLongitude, radiusKm, null, null, null);
     }
 
     /**
@@ -96,12 +99,15 @@ public class SearchCriteria extends ValueObject {
         Double centerLatitude,
         Double centerLongitude,
         Double radiusKm,
-        String featureName
+        String featureName,
+        LocalDate startDate,
+        LocalDate endDate
     ) {
         if (minPrice != null && maxPrice != null) {
             validatePriceRange(minPrice, maxPrice);
         }
-        return new SearchCriteria(categories, minPrice, maxPrice, minYear, maxYear, seats, transmission, fuelType, location, centerLatitude, centerLongitude, radiusKm, featureName);
+        validateDateRange(startDate, endDate);
+        return new SearchCriteria(categories, minPrice, maxPrice, minYear, maxYear, seats, transmission, fuelType, location, centerLatitude, centerLongitude, radiusKm, featureName, startDate, endDate);
     }
 
     // ========== Validation ==========
@@ -118,6 +124,21 @@ public class SearchCriteria extends ValueObject {
         }
         if (minPrice.compareTo(maxPrice) > 0) {
             throw new IllegalArgumentException("minPrice must be <= maxPrice");
+        }
+    }
+
+    /**
+     * Validate date range: if either bound is provided, both must be provided and startDate <= endDate.
+     */
+    private static void validateDateRange(LocalDate startDate, LocalDate endDate) {
+        if (startDate == null && endDate == null) {
+            return;
+        }
+        if (startDate == null || endDate == null) {
+            throw new IllegalArgumentException("Both startDate and endDate are required for a date-range search");
+        }
+        if (startDate.isAfter(endDate)) {
+            throw new IllegalArgumentException("startDate must be <= endDate");
         }
     }
 
@@ -192,6 +213,14 @@ public class SearchCriteria extends ValueObject {
         return centerLatitude != null && centerLongitude != null && radiusKm != null;
     }
 
+    /**
+     * Check if this criteria filters by a date range (availability-aware search, TS20).
+     * Requires both startDate and endDate.
+     */
+    public boolean hasDateRange() {
+        return startDate != null && endDate != null;
+    }
+
     // ========== Value Object Contract ==========
 
     @Override
@@ -207,12 +236,14 @@ public class SearchCriteria extends ValueObject {
                Objects.equals(seats, that.seats) &&
                Objects.equals(transmission, that.transmission) &&
                Objects.equals(fuelType, that.fuelType) &&
-               Objects.equals(location, that.location);
+               Objects.equals(location, that.location) &&
+               Objects.equals(startDate, that.startDate) &&
+               Objects.equals(endDate, that.endDate);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(categories, minPrice, maxPrice, minYear, maxYear, seats, transmission, fuelType, location);
+        return Objects.hash(categories, minPrice, maxPrice, minYear, maxYear, seats, transmission, fuelType, location, startDate, endDate);
     }
 
     @Override
@@ -227,6 +258,8 @@ public class SearchCriteria extends ValueObject {
             ", transmission='" + transmission + '\'' +
             ", fuelType='" + fuelType + '\'' +
                 ", location='" + location + '\'' +
+                ", startDate=" + startDate +
+                ", endDate=" + endDate +
                 '}';
     }
 }

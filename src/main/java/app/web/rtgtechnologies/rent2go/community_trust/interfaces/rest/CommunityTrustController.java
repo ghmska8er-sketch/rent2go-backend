@@ -46,10 +46,13 @@ import app.web.rtgtechnologies.rent2go.community_trust.interfaces.rest.resources
 import app.web.rtgtechnologies.rent2go.community_trust.interfaces.rest.resources.UserReputationResource;
 import app.web.rtgtechnologies.rent2go.community_trust.interfaces.rest.resources.VehicleRatingResource;
 import app.web.rtgtechnologies.rent2go.community_trust.infrastructure.persistence.jpa.repositories.UserReputationRepository;
+import app.web.rtgtechnologies.rent2go.community_trust.infrastructure.persistence.jpa.repositories.TrustReportRepository;
+import app.web.rtgtechnologies.rent2go.shared.application.internal.services.CurrentUserService;
 import jakarta.validation.Valid;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
@@ -68,6 +71,8 @@ public class CommunityTrustController {
     private final ConversationCommandServiceImpl conversationCommandService;
     private final ConversationQueryServiceImpl conversationQueryService;
     private final UserReputationRepository userReputationRepository;
+    private final TrustReportRepository trustReportRepository;
+    private final CurrentUserService currentUserService;
     private final SubmitReviewCommandFromResourceAssembler submitAssembler;
     private final FlagReviewCommandFromResourceAssembler flagAssembler;
     private final ModerationActionCommandFromResourceAssembler moderationAssembler;
@@ -240,11 +245,17 @@ public class CommunityTrustController {
     }
 
     @GetMapping("/conversations/{conversationId}")
-    @Operation(summary = "Get conversation", description = "Returns a conversation by its identifier.")
+    @Operation(summary = "Get conversation", description = "Returns a conversation by its identifier. Only its owner/renter participants may view it.")
     public ResponseEntity<ConversationResource> getConversation(@PathVariable Long conversationId) {
-        return conversationQueryService.handle(new GetConversationByIdQuery(conversationId))
-            .map(conversation -> ResponseEntity.ok(conversationAssembler.toResource(conversation)))
-            .orElseGet(() -> ResponseEntity.notFound().build());
+        var conversationOpt = conversationQueryService.handle(new GetConversationByIdQuery(conversationId));
+        if (conversationOpt.isEmpty()) {
+            return ResponseEntity.notFound().build();
+        }
+        var conversation = conversationOpt.get();
+        if (!isParticipantOrAdmin(conversation)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+        }
+        return ResponseEntity.ok(conversationAssembler.toResource(conversation));
     }
 
     @GetMapping("/users/{userId}/conversations")
@@ -255,8 +266,15 @@ public class CommunityTrustController {
     }
 
     @PostMapping("/conversations/{conversationId}/messages")
-    @Operation(summary = "Send message", description = "Adds a message to an existing conversation.")
+    @Operation(summary = "Send message", description = "Adds a message to an existing conversation. Only its owner/renter participants may send messages.")
     public ResponseEntity<MessageResource> sendMessage(@PathVariable Long conversationId, @Valid @RequestBody SendMessageResource resource) {
+        var conversationOpt = conversationQueryService.handle(new GetConversationByIdQuery(conversationId));
+        if (conversationOpt.isEmpty()) {
+            return ResponseEntity.notFound().build();
+        }
+        if (!isParticipantOrAdmin(conversationOpt.get())) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+        }
         SendMessageCommand command = sendMessageAssembler.toCommand(conversationId, resource);
         var saved = conversationCommandService.handle(command);
         return ResponseEntity.created(URI.create("/api/v1/community-trust/conversations/" + conversationId + "/messages/" + saved.getId()))
@@ -264,16 +282,66 @@ public class CommunityTrustController {
     }
 
     @GetMapping("/conversations/{conversationId}/messages")
-    @Operation(summary = "List conversation messages", description = "Returns all messages in a conversation.")
+    @Operation(summary = "List conversation messages", description = "Returns all messages in a conversation. Only its owner/renter participants may view them.")
     public ResponseEntity<List<MessageResource>> getMessagesByConversation(@PathVariable Long conversationId) {
+        var conversationOpt = conversationQueryService.handle(new GetConversationByIdQuery(conversationId));
+        if (conversationOpt.isEmpty()) {
+            return ResponseEntity.notFound().build();
+        }
+        if (!isParticipantOrAdmin(conversationOpt.get())) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+        }
         var results = conversationQueryService.handle(new GetMessagesByConversationQuery(conversationId));
         return ResponseEntity.ok(results.stream().map(messageAssembler::toResource).toList());
     }
 
     @PostMapping("/conversations/{conversationId}/close")
-    @Operation(summary = "Close conversation", description = "Closes an open conversation when the owner or renter ends it.")
+    @Operation(summary = "Close conversation", description = "Closes an open conversation when the owner or renter ends it. Only its owner/renter participants may close it.")
     public ResponseEntity<ConversationResource> closeConversation(@PathVariable Long conversationId, @RequestParam Long userId) {
+        var conversationOpt = conversationQueryService.handle(new GetConversationByIdQuery(conversationId));
+        if (conversationOpt.isEmpty()) {
+            return ResponseEntity.notFound().build();
+        }
+        if (!isParticipantOrAdmin(conversationOpt.get())) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+        }
         var saved = conversationCommandService.handle(new CloseConversationCommand(conversationId, userId));
         return ResponseEntity.ok(conversationAssembler.toResource(saved));
+    }
+
+    @GetMapping("/users/{userId}/disputes")
+    @Operation(summary = "Get my disputes", description = "Returns the authenticated user's own reservation dispute/report submissions (US42). Only the authenticated user may query their own disputes.")
+    public ResponseEntity<List<TrustReportResource>> getMyDisputes(@PathVariable Long userId) {
+        if (!currentUserService.isOwnerOrAdmin(userId)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+        }
+        var results = trustReportRepository.findAllByReporterIdOrderByCreatedAtDesc(userId);
+        return ResponseEntity.ok(results.stream().map(report -> new TrustReportResource(
+                report.getId(),
+                report.getSubjectType() == null ? null : report.getSubjectType().name(),
+                report.getSubjectId(),
+                report.getReservationId(),
+                report.getReviewId(),
+                report.getReportedUserId(),
+                report.getReporterId(),
+                report.getReason(),
+                report.getStatus() == null ? null : report.getStatus().name(),
+                report.getModerationNote(),
+                report.getCreatedAt() == null ? null : report.getCreatedAt().toString(),
+                report.getUpdatedAt() == null ? null : report.getUpdatedAt().toString()
+        )).toList());
+    }
+
+    /**
+     * Returns true if the current authenticated caller is either a participant of the given
+     * conversation (its ownerId or renterId) or an admin.
+     */
+    private boolean isParticipantOrAdmin(app.web.rtgtechnologies.rent2go.community_trust.domain.model.aggregates.Conversation conversation) {
+        if (currentUserService.isCurrentUserAdmin()) {
+            return true;
+        }
+        return currentUserService.getCurrentUserId()
+                .map(conversation::belongsTo)
+                .orElse(false);
     }
 }

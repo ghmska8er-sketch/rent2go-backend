@@ -47,11 +47,15 @@ public class ReservationCommandServiceImpl implements ReservationCommandService 
 
         DateRange requestedRange = DateRange.of(command.startDate(), command.endDate());
 
-        // RES-02: validate no overlapping confirmed/active/pending reservation exists for this vehicle
+        // RES-02: validate no overlapping reservation exists for this vehicle in a blocking status.
+        // Blocking set: PENDING, CONFIRMED, ACTIVE, RETURN_PENDING, RETURN_CONFIRMED — the vehicle is
+        // still physically committed to a prior renter during the two RETURN_ states, so they must
+        // block new overlapping reservations just like the earlier lifecycle states (TS20 consistency fix).
         var existingReservations = reservationRepository.findAllByVehicleId(command.vehicleId());
         for (var existing : existingReservations) {
             var status = existing.getStatus().getStatus();
-            if ("CONFIRMED".equals(status) || "ACTIVE".equals(status) || "PENDING".equals(status)) {
+            if ("CONFIRMED".equals(status) || "ACTIVE".equals(status) || "PENDING".equals(status)
+                || "RETURN_PENDING".equals(status) || "RETURN_CONFIRMED".equals(status)) {
                 if (existing.getDateRange().overlaps(requestedRange)) {
                     throw new IllegalStateException(
                         "El vehículo ya tiene una reserva para las fechas solicitadas.");

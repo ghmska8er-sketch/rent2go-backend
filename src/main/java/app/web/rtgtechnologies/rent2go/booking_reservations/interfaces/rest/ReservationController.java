@@ -87,8 +87,14 @@ public class ReservationController {
     @Operation(summary = "Update reservation status", description = "Transitions a reservation to another allowed status.")
     public ResponseEntity<ReservationResource> updateReservationStatus(@PathVariable Long id, @RequestBody @Valid UpdateReservationStatusResource resource) {
         var command = updateStatusAssembler.toCommand(id, resource);
-        var updated = commandService.handle(command);
-        return ResponseEntity.ok(resourceAssembler.toResource(updated));
+        try {
+            var updated = commandService.handle(command);
+            return ResponseEntity.ok(resourceAssembler.toResource(updated));
+        } catch (IllegalStateException e) {
+            return ResponseEntity.status(org.springframework.http.HttpStatus.CONFLICT).build();
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().build();
+        }
     }
 
     @PostMapping("/{id}/confirm")

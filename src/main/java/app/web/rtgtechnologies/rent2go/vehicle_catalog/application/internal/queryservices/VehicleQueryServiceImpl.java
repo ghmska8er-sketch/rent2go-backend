@@ -1,5 +1,6 @@
 package app.web.rtgtechnologies.rent2go.vehicle_catalog.application.internal.queryservices;
 
+import app.web.rtgtechnologies.rent2go.booking_reservations.domain.model.services.VehicleAvailabilityQueryService;
 import app.web.rtgtechnologies.rent2go.vehicle_catalog.domain.model.aggregates.Vehicle;
 import app.web.rtgtechnologies.rent2go.vehicle_catalog.domain.model.aggregates.VehicleImage;
 import app.web.rtgtechnologies.rent2go.vehicle_catalog.domain.model.queries.GetAvailableVehiclesQuery;
@@ -35,6 +36,10 @@ import java.util.List;
 public class VehicleQueryServiceImpl implements VehicleQueryService {
 
     private final VehicleRepository vehicleRepository;
+    // Cross-bounded-context read dependency (vehicle_catalog -> booking_reservations), mirroring the
+    // already-accepted community_trust -> iam precedent in ReviewCommandServiceImpl. Used only for
+    // TS20's availability-aware search exclusion; batched (not per-vehicle) to avoid N+1 queries.
+    private final VehicleAvailabilityQueryService vehicleAvailabilityQueryService;
 
     /**
      * Handle GetAvailableVehiclesQuery
@@ -205,6 +210,20 @@ public class VehicleQueryServiceImpl implements VehicleQueryService {
                            v.getFeatures().stream()
                                .anyMatch(f -> f.getName() != null && f.getName().toLowerCase().contains(feature)))
                 .toList();
+        }
+
+        // TS20: exclude vehicles blocked for the requested date range (availability block or an
+        // overlapping reservation in PENDING/CONFIRMED/ACTIVE/RETURN_PENDING/RETURN_CONFIRMED).
+        // Delegated to booking_reservations' own batched query — no direct cross-context JPQL join,
+        // consistent with the DDD bounded-context boundary respected elsewhere in this codebase.
+        if (criteria.hasDateRange()) {
+            var blockedVehicleIds = vehicleAvailabilityQueryService.findBlockedVehicleIds(
+                criteria.getStartDate(), criteria.getEndDate());
+            if (!blockedVehicleIds.isEmpty()) {
+                results = results.stream()
+                    .filter(v -> !blockedVehicleIds.contains(v.getId()))
+                    .toList();
+            }
         }
 
         return results;

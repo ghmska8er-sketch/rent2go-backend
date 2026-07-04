@@ -37,4 +37,13 @@ public interface ReservationRepository extends JpaRepository<Reservation, Long> 
 
     @Query("SELECT r FROM Reservation r WHERE r.status.status = 'PENDING' AND r.dateRange.startDate < :today")
     List<Reservation> findAllPendingExpiredBefore(@Param("today") LocalDate today);
+
+    /**
+     * TS20 — availability-aware search support.
+     * Returns all reservations in a blocking status, for in-memory date-overlap filtering
+     * (kept in-memory/batched rather than a per-vehicle query to avoid N+1, consistent with
+     * VehicleAvailabilityQueryServiceImpl's existing style).
+     */
+    @Query("SELECT r FROM Reservation r WHERE r.status.status IN ('PENDING', 'CONFIRMED', 'ACTIVE', 'RETURN_PENDING', 'RETURN_CONFIRMED')")
+    List<Reservation> findAllInBlockingStatus();
 }

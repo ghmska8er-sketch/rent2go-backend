@@ -62,6 +62,10 @@ public class WithdrawalService {
     /**
      * Requests a withdrawal for the given owner. Throws IllegalArgumentException if the
      * requested amount exceeds the owner's currently available balance.
+     *
+     * Per US66 (Sprint 5), the withdrawal is transitioned to COMPLETED synchronously right
+     * after balance validation and persistence, in the same request — this remains a mock
+     * payout system with no real payout rail and no async workflow/admin step.
      */
     public Withdrawal requestWithdrawal(Long ownerId, Long amountCents, String payoutDestinationNote) {
         if (amountCents == null || amountCents <= 0) {
@@ -72,6 +76,7 @@ public class WithdrawalService {
             throw new IllegalArgumentException("Requested amount exceeds available balance");
         }
         var withdrawal = new Withdrawal(ownerId, amountCents, payoutDestinationNote);
+        withdrawal.complete();
         return withdrawalRepository.save(withdrawal);
     }
 

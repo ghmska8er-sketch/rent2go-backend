@@ -87,7 +87,7 @@ class VehiclePerformanceServiceImplTest {
         VehiclePerformanceResource result = service.getPerformance(2L, LocalDate.of(2026, 1, 1), LocalDate.of(2026, 1, 31));
 
         assertEquals(new BigDecimal("150.00"), result.getTotalRevenue());
-        assertEquals("USD", result.getCurrency());
+        assertEquals("PEN", result.getCurrency());
     }
 
     @Test

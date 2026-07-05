@@ -12,12 +12,18 @@ import app.web.rtgtechnologies.rent2go.vehicle_catalog.domain.model.services.Veh
 import app.web.rtgtechnologies.rent2go.vehicle_catalog.domain.model.valueobjects.SearchCriteria;
 import app.web.rtgtechnologies.rent2go.vehicle_catalog.domain.model.valueobjects.VehicleStatus;
 import app.web.rtgtechnologies.rent2go.vehicle_catalog.infrastructure.persistence.jpa.repositories.VehicleRepository;
+import app.web.rtgtechnologies.rent2go.vehicle_catalog.infrastructure.persistence.jpa.specifications.VehicleSpecifications;
 import lombok.AllArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.Set;
 
 /**
  * VehicleQueryServiceImpl
@@ -227,6 +233,80 @@ public class VehicleQueryServiceImpl implements VehicleQueryService {
         }
 
         return results;
+    }
+
+    /**
+     * Sprint 5 (TS22, BRD-2026-07-05-Paginacion-Real-Backend-Vehiculos.md): real DB-level
+     * paginated search. Price/category/year/seats/transmission/fuelType/location/feature-name
+     * and the TS20 availability-exclusion NOT IN predicate are all composed into a single
+     * {@link Specification}, so {@code Page.getTotalElements()}/{@code getTotalPages()} are
+     * computed by the database's own COUNT query against the fully-filtered predicate.
+     *
+     * Geo-radius (Haversine) is the one deliberately-scoped exception per the BRD's explicit
+     * recommendation (§7.2, §11 Open Question 1): it cannot be expressed as a JPA
+     * {@code Specification} predicate without a native DB geospatial function, which Sprint 4
+     * chose not to introduce. When a radius filter is present, this method evaluates every
+     * DB-expressible predicate as an unpaged candidate set, applies the in-memory Haversine
+     * filter to that full candidate set, and only then paginates in memory — preserving
+     * correct, non-duplicated, non-missing results and an accurate totalElements/totalPages
+     * for this specific, narrow, tested exception, at the cost of not being a DB-level
+     * LIMIT/OFFSET for radius searches specifically.
+     */
+    @Override
+    public Page<Vehicle> handlePaged(SearchVehiclesByCriteriaQuery query, Pageable pageable) {
+        SearchCriteria criteria = query.criteria();
+
+        Set<Long> excludedVehicleIds = Set.of();
+        if (criteria.hasDateRange()) {
+            excludedVehicleIds = vehicleAvailabilityQueryService.findBlockedVehicleIds(
+                criteria.getStartDate(), criteria.getEndDate());
+        }
+
+        Specification<Vehicle> spec = VehicleSpecifications.fromCriteria(criteria, VehicleStatus.AVAILABLE, excludedVehicleIds);
+
+        if (criteria.hasRadius()) {
+            // Documented exception: DB-expressible filters resolved unpaged, Haversine and
+            // pagination both applied in memory against that single, fully-filtered candidate
+            // set -- never against an already-DB-paginated page (which would silently corrupt
+            // totalElements/totalPages, see the BRD's R-001/R-003).
+            List<Vehicle> candidates = vehicleRepository.findAll(spec);
+            List<Vehicle> filtered = filterByRadius(candidates, criteria);
+            return paginateInMemory(filtered, pageable);
+        }
+
+        return vehicleRepository.findAll(spec, pageable);
+    }
+
+    @Override
+    public Page<Vehicle> handlePaged(GetVehiclesByOwnerQuery query, Pageable pageable) {
+        return vehicleRepository.findByOwnerId(query.ownerId(), pageable);
+    }
+
+    private List<Vehicle> filterByRadius(List<Vehicle> vehicles, SearchCriteria criteria) {
+        final double centerLat = Math.toRadians(criteria.getCenterLatitude());
+        final double centerLng = Math.toRadians(criteria.getCenterLongitude());
+        final double radiusKm = criteria.getRadiusKm();
+
+        return vehicles.stream()
+            .filter(v -> {
+                BigDecimal vehicleLat = v.getLatitude();
+                BigDecimal vehicleLng = v.getLongitude();
+                if (vehicleLat == null || vehicleLng == null) {
+                    return false;
+                }
+                double distance = calculateDistanceHaversine(centerLat, centerLng,
+                    Math.toRadians(vehicleLat.doubleValue()), Math.toRadians(vehicleLng.doubleValue()));
+                return distance <= radiusKm;
+            })
+            .toList();
+    }
+
+    private Page<Vehicle> paginateInMemory(List<Vehicle> filtered, Pageable pageable) {
+        int total = filtered.size();
+        int fromIndex = Math.min((int) pageable.getOffset(), total);
+        int toIndex = Math.min(fromIndex + pageable.getPageSize(), total);
+        List<Vehicle> pageContent = filtered.subList(fromIndex, toIndex);
+        return new PageImpl<>(pageContent, pageable, total);
     }
 
     /**

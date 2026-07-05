@@ -2,6 +2,8 @@ package app.web.rtgtechnologies.rent2go.community_trust.interfaces.rest.assemble
 
 import app.web.rtgtechnologies.rent2go.community_trust.domain.model.aggregates.Conversation;
 import app.web.rtgtechnologies.rent2go.iam.domain.model.aggregates.User;
+import app.web.rtgtechnologies.rent2go.iam.infrastructure.persistence.jpa.entities.KycApplication;
+import app.web.rtgtechnologies.rent2go.iam.infrastructure.persistence.jpa.repositories.KycApplicationRepository;
 import app.web.rtgtechnologies.rent2go.iam.infrastructure.persistence.jpa.repositories.UserRepository;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -26,6 +28,9 @@ class ConversationResourceFromEntityAssemblerTest {
     @Mock
     private UserRepository userRepository;
 
+    @Mock
+    private KycApplicationRepository kycApplicationRepository;
+
     @InjectMocks
     private ConversationResourceFromEntityAssembler assembler;
 
@@ -46,6 +51,25 @@ class ConversationResourceFromEntityAssemblerTest {
         assertEquals(Boolean.TRUE, resource.owner().kycVerified());
         assertNotNull(resource.renter());
         assertEquals("Ana Torres", resource.renter().fullName());
+    }
+
+    @Test
+    void splitVerificationBadgesReflectMostRecentKycApplicationStatus() {
+        Conversation conversation = Conversation.start(2L, 1L, 5L, null, "Consulta sobre el vehiculo");
+        User owner = mockUser(2L, "Luis Ramos", true);
+        when(userRepository.findById(2L)).thenReturn(Optional.of(owner));
+        when(userRepository.findById(1L)).thenReturn(Optional.empty());
+        KycApplication approved = new KycApplication(2L, "Luis Ramos", "12345678",
+                "front.png", "back.png", "license.png", "APPROVED", java.time.Instant.now());
+        when(kycApplicationRepository.findFirstByUserIdOrderByCreatedAtDesc(2L))
+                .thenReturn(Optional.of(approved));
+
+        var resource = assembler.toResource(conversation);
+
+        assertEquals(Boolean.TRUE, resource.owner().dniVerified());
+        assertEquals(Boolean.TRUE, resource.owner().licenseVerified());
+        assertEquals(Boolean.FALSE, resource.renter().dniVerified());
+        assertEquals(Boolean.FALSE, resource.renter().licenseVerified());
     }
 
     @Test

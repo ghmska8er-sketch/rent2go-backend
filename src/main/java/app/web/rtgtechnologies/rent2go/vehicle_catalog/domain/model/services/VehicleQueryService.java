@@ -7,6 +7,8 @@ import app.web.rtgtechnologies.rent2go.vehicle_catalog.domain.model.queries.GetV
 import app.web.rtgtechnologies.rent2go.vehicle_catalog.domain.model.queries.GetVehicleImagesQuery;
 import app.web.rtgtechnologies.rent2go.vehicle_catalog.domain.model.queries.GetVehiclesByOwnerQuery;
 import app.web.rtgtechnologies.rent2go.vehicle_catalog.domain.model.queries.SearchVehiclesByCriteriaQuery;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 
 import java.util.List;
 
@@ -66,4 +68,26 @@ public interface VehicleQueryService {
      * @return List of all available vehicles
      */
     List<Vehicle> getAllAvailableVehicles();
+
+    /**
+     * Sprint 5 (TS22, BRD-2026-07-05-Paginacion-Real-Backend-Vehiculos.md): real DB-level
+     * paginated search, replacing the prior load-all-then-slice-in-Java approach. Additive —
+     * the existing {@link #handle(SearchVehiclesByCriteriaQuery)} list-returning method is
+     * unchanged for any other caller.
+     *
+     * @param query    SearchVehiclesByCriteriaQuery with search filters
+     * @param pageable page/size/sort request, applied at the database level
+     * @return a Page of vehicles matching criteria, with a database-computed total count
+     */
+    Page<Vehicle> handlePaged(SearchVehiclesByCriteriaQuery query, Pageable pageable);
+
+    /**
+     * Sprint 5 (TS22) — real DB-level paginated variant of
+     * {@link #handle(GetVehiclesByOwnerQuery)}, for {@code GET /api/v1/vehicles/me}.
+     *
+     * @param query    GetVehiclesByOwnerQuery with owner ID
+     * @param pageable page/size/sort request, applied at the database level
+     * @return a Page of vehicles owned by that user, with a database-computed total count
+     */
+    Page<Vehicle> handlePaged(GetVehiclesByOwnerQuery query, Pageable pageable);
 }

@@ -57,4 +57,14 @@ public class Withdrawal {
         this.status = WithdrawalStatus.PENDING;
         this.requestedAt = LocalDateTime.now();
     }
+
+    /**
+     * Transitions this withdrawal to COMPLETED. Per US66 (Sprint 5), this remains a mock
+     * payout system with no real payout rail — completion happens synchronously right after
+     * balance validation and persistence, in the same request, with no async workflow and no
+     * admin step.
+     */
+    public void complete() {
+        this.status = WithdrawalStatus.COMPLETED;
+    }
 }

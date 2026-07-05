@@ -64,7 +64,11 @@ public class Review extends AuditableAbstractAggregateRoot<Review> {
         this.category = category;
         this.rating = rating;
         this.comment = comment;
-        this.status = ReviewStatus.PENDING();
+        // Sprint 5 (US70/TS21, BRD-2026-07-05-Politica-Aprobacion-Reviews.md, Option A):
+        // auto-approve at creation. No admin moderation workflow exists or is planned for
+        // this project, so a PENDING default provided no real moderation value -- it only
+        // structurally suppressed every review/rating from view.
+        this.status = ReviewStatus.APPROVED();
         this.flagCount = 0;
     }
 

@@ -81,7 +81,10 @@ public class VehiclePerformanceServiceImpl implements VehiclePerformanceService 
         resource.setTo(periodEnd.toString());
         resource.setReservationCount(reservationCount);
         resource.setTotalRevenue(totalRevenue);
-        resource.setCurrency("USD");
+        // US69 (display-label-only, per BRD-2026-07-05-Estrategia-Moneda-Soles-vs-Dolares.md):
+        // vehicle performance revenue is user-facing Soles copy. Stripe's actual processing
+        // currency is a separate, unaffected code path (PaymentsController.createIntent).
+        resource.setCurrency("PEN");
         resource.setOccupancyPercentage(occupancyPercentage);
 
         log.info("Vehicle performance computed for vehicleId={}: reservationCount={}, totalRevenue={}, occupancyPercentage={}",

@@ -2,6 +2,8 @@ package app.web.rtgtechnologies.rent2go.vehicle_catalog.infrastructure.persisten
 
 import app.web.rtgtechnologies.rent2go.vehicle_catalog.domain.model.aggregates.Vehicle;
 import app.web.rtgtechnologies.rent2go.vehicle_catalog.domain.model.valueobjects.VehicleStatus;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Query;
@@ -31,6 +33,12 @@ public interface VehicleRepository extends JpaRepository<Vehicle, Long>, JpaSpec
     List<Vehicle> findByCategoryId(Long categoryId);
 
     List<Vehicle> findByOwnerId(Long ownerId);
+
+    /**
+     * Sprint 5 (TS22): real DB-level paginated variant for GET /api/v1/vehicles/me, replacing
+     * the prior load-all-then-slice-in-Java approach.
+     */
+    Page<Vehicle> findByOwnerId(Long ownerId, Pageable pageable);
 
     @Query("SELECT v FROM Vehicle v WHERE v.status = :status AND v.dailyPrice BETWEEN :minPrice AND :maxPrice")
     List<Vehicle> findAvailableVehiclesByPriceRange(

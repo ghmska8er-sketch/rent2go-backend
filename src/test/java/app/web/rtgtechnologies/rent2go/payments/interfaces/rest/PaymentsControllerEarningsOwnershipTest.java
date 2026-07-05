@@ -73,6 +73,21 @@ class PaymentsControllerEarningsOwnershipTest {
     }
 
     @Test
+    void getOwnerEarnings_reportsPenCurrency_perUS69DisplayLabelMigration() {
+        when(currentUserService.isOwnerOrAdmin(7L)).thenReturn(true);
+        when(paymentsService.sumSucceededAmountCentsByOwnerBetween(org.mockito.ArgumentMatchers.eq(7L), org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any()))
+                .thenReturn(10000L);
+        when(paymentsService.countSucceededPaymentsByOwnerBetween(org.mockito.ArgumentMatchers.eq(7L), org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any()))
+                .thenReturn(3L);
+        when(withdrawalService.getAvailableBalanceCents(7L)).thenReturn(10000L);
+        when(withdrawalService.getPendingWithdrawnCents(7L)).thenReturn(0L);
+
+        var response = controller.getOwnerEarnings(7L, "2026-01-01", "2026-01-31");
+
+        assertEquals("PEN", response.getBody().getCurrency());
+    }
+
+    @Test
     void getOwnerEarnings_returnsForbidden_whenCallerIsDifferentUser() {
         when(currentUserService.isOwnerOrAdmin(7L)).thenReturn(false);
 

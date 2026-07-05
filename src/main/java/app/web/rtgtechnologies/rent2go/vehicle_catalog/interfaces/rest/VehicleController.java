@@ -36,6 +36,9 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.security.access.prepost.PreAuthorize;
 import lombok.AllArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -183,8 +186,12 @@ public class VehicleController {
     ) {
         Long ownerId = extractUserIdFromAuthHeader(authHeader);
 
-        List<Vehicle> vehicles = vehicleQueryService.handle(new GetVehiclesByOwnerQuery(ownerId));
-        return ResponseEntity.ok(toPagedResponse(vehicles, page, size, VehicleResourceFromEntityAssembler::toResource));
+        // TS22: real DB-level pagination, replacing the prior load-all-then-slice-in-Java
+        // approach. toPageable() preserves this endpoint's pre-existing 1-indexed `page`
+        // client contract exactly (page=1 was always treated as the first page here).
+        Pageable pageable = toPageable(page, size);
+        Page<Vehicle> vehiclePage = vehicleQueryService.handlePaged(new GetVehiclesByOwnerQuery(ownerId), pageable);
+        return ResponseEntity.ok(toPagedResponse(vehiclePage, page, VehicleResourceFromEntityAssembler::toResource));
     }
 
     /**
@@ -247,8 +254,13 @@ public class VehicleController {
             endDate
         );
 
-        List<Vehicle> vehicles = vehicleQueryService.handle(new SearchVehiclesByCriteriaQuery(criteria));
-        return ResponseEntity.ok(toPagedResponse(vehicles, page, size, VehicleResourceFromEntityAssembler::toResource));
+        // TS22: real DB-level pagination via VehicleQueryServiceImpl.handlePaged, composing
+        // ALL existing filters (price/category/seats/transmission/fuel/geo-radius) plus the
+        // TS20 availability-exclusion NOT IN predicate into one query. See that method's
+        // Javadoc for the one documented exception (geo-radius) and why it remains correct.
+        Pageable pageable = toPageable(page, size);
+        Page<Vehicle> vehiclePage = vehicleQueryService.handlePaged(new SearchVehiclesByCriteriaQuery(criteria), pageable);
+        return ResponseEntity.ok(toPagedResponse(vehiclePage, page, VehicleResourceFromEntityAssembler::toResource));
     }
 
     /**
@@ -543,6 +555,36 @@ public class VehicleController {
         return jwtTokenProvider.extractUserIdFromToken(token);
     }
 
+    /**
+     * TS22: converts this endpoint's pre-existing, client-visible 1-indexed `page` parameter
+     * (page=1 is the first page, matching this controller's historical contract before this
+     * migration) into a 0-indexed Spring Data {@link Pageable}, without changing that
+     * client-visible contract.
+     */
+    private Pageable toPageable(int page, int size) {
+        int safePage = Math.max(1, page);
+        int safeSize = Math.max(1, size);
+        return PageRequest.of(safePage - 1, safeSize);
+    }
+
+    /**
+     * TS22: rebuilds the exact same {@code PagedResponse} shape
+     * (content/page/size/totalElements/totalPages) the prior in-memory-slicing
+     * {@code toPagedResponse(List, int, int, Function)} produced, but now sourced directly
+     * from a real {@link Page} whose totalElements/totalPages were computed by the database's
+     * own COUNT query — no client-visible contract change.
+     */
+    private <T, R> PagedResponse<R> toPagedResponse(Page<T> source, int page, Function<T, R> mapper) {
+        int safePage = Math.max(1, page);
+        List<R> content = source.getContent().stream().map(mapper).collect(Collectors.toList());
+        return new PagedResponse<>(content, safePage, source.getSize(), source.getTotalElements(), source.getTotalPages());
+    }
+
+    /**
+     * Unchanged, in-memory slicing helper — out of TS22's scope (GET /{id}/images is a
+     * small, per-vehicle, already-loaded collection, not the catalog-scale search/listing
+     * endpoints this migration targets).
+     */
     private <T, R> PagedResponse<R> toPagedResponse(List<T> source, int page, int size, Function<T, R> mapper) {
         int safePage = Math.max(1, page);
         int safeSize = Math.max(1, size);

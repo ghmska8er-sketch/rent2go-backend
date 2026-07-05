@@ -76,9 +76,9 @@ public class PaymentsController {
     public ResponseEntity<java.util.List<java.util.Map<String, Object>>> getCoveragePlans() {
         var plans = java.util.List.of(
             coveragePlan("BASIC", "Basic Coverage",
-                "Covers liability and minor damage. Deductible: $500.", BigDecimal.valueOf(5.00)),
+                "Covers liability and minor damage. Deductible: S/ 500.", BigDecimal.valueOf(5.00)),
             coveragePlan("STANDARD", "Standard Coverage",
-                "Covers liability, collision, and theft with a $250 deductible.", BigDecimal.valueOf(12.00)),
+                "Covers liability, collision, and theft with a S/ 250 deductible.", BigDecimal.valueOf(12.00)),
             coveragePlan("PREMIUM", "Premium Coverage",
                 "Full coverage with zero deductible, including roadside assistance.", BigDecimal.valueOf(20.00)),
             coveragePlan("NONE", "No Coverage",
@@ -92,6 +92,9 @@ public class PaymentsController {
         m.put("code", code);
         m.put("name", name);
         m.put("description", description);
+        // Field name kept as dailyRateUSD (internal, non-user-visible) per
+        // BRD-2026-07-05-Estrategia-Moneda-Soles-vs-Dolares.md §11.2 -- renaming is deferred
+        // as an optional, separately-scoped cross-repo cleanup, not required for correctness.
         m.put("dailyRateUSD", dailyRate);
         return m;
     }
@@ -309,7 +312,10 @@ public class PaymentsController {
             resource.setOwnerId(ownerId);
             resource.setFrom(from);
             resource.setTo(to);
-            resource.setCurrency("USD");
+            // US69 (display-label-only, per BRD-2026-07-05-Estrategia-Moneda-Soles-vs-Dolares.md):
+            // owner earnings are user-facing Soles copy. Stripe's actual processing currency
+            // (createPaymentIntent's 'usd' default, above in this same class) is unaffected.
+            resource.setCurrency("PEN");
             long cents = totalCents != null ? totalCents : 0L;
             resource.setTotalAmountCents(cents);
             resource.setTotalAmount(BigDecimal.valueOf(cents).divide(BigDecimal.valueOf(100), 2, java.math.RoundingMode.HALF_UP));

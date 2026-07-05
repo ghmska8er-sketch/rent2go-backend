@@ -29,5 +29,10 @@ public record ReservationResource(
     @JsonProperty("renter")
     CounterpartyResource renter,
     @JsonProperty("owner")
-    CounterpartyResource owner
+    CounterpartyResource owner,
+    // Sprint 5 (US76/TS23) — additive: the vehicle's catalog photo, sourced from
+    // Vehicle.primaryImageUrl. Null when the vehicle has no registered image. Distinct from
+    // pickupPhotos/returnPhotos above (check-in condition photos, a separate concept).
+    @JsonProperty("vehicle_image")
+    String vehicleImage
 ) {}

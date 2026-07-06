@@ -141,6 +141,41 @@ class VehicleQueryServiceImplTest {
     }
 
     @Test
+    void handlePaged_withRadius_realisticNearbyAndFarDistances_appliesCorrectHaversineFilterAndPagination() {
+        // Regression test for a bug where calculateDistanceHaversine's arguments were
+        // pre-converted to radians by every caller (filterByRadius/handle) and then converted
+        // to radians AGAIN inside the method itself. That double conversion shrinks the
+        // effective angular delta by another ~57x (180/pi), so two points genuinely ~8km apart
+        // were computed as ~0.14km apart. The previous tests in this file only used
+        // planet-scale fixture distances (~9000km vs ~0km), which still separated correctly
+        // even under 57x compression -- masking the bug. This test uses realistic single/
+        // double-digit-km distances around a 10km radius, which the buggy code would have
+        // classified entirely wrong (a genuinely-out-of-range 40km vehicle would have computed
+        // to well under 1km and incorrectly passed the filter).
+        SearchCriteria criteria = SearchCriteria.full(null, null, null, null, null, null, null, null, null,
+                -12.05, -77.03, 10.0, null, null, null);
+        Pageable pageable = PageRequest.of(0, 10);
+
+        // ~1km north of center: clearly inside a 10km radius.
+        Vehicle near = mockVehicleAt(-12.0410, -77.03);
+        // ~8km north of center: still inside a 10km radius (realistic edge case).
+        Vehicle within8km = mockVehicleAt(-12.0220, -77.03);
+        // ~40km north of center: clearly OUTSIDE a 10km radius. Under the double-radian-
+        // conversion bug this collapses to well under 1km and would incorrectly pass.
+        Vehicle far40km = mockVehicleAt(-11.6900, -77.03);
+
+        when(vehicleRepository.findAll(org.mockito.ArgumentMatchers.<Specification<Vehicle>>any()))
+                .thenReturn(List.of(near, within8km, far40km));
+
+        Page<Vehicle> result = service.handlePaged(new SearchVehiclesByCriteriaQuery(criteria), pageable);
+
+        assertEquals(2, result.getTotalElements());
+        assertEquals(1, result.getTotalPages());
+        assertTrue(result.getContent().containsAll(List.of(near, within8km)));
+        assertTrue(!result.getContent().contains(far40km));
+    }
+
+    @Test
     void handlePaged_ownerQuery_delegatesToRepositoryPageableOverload() {
         Pageable pageable = PageRequest.of(0, 20);
         Page<Vehicle> expected = new PageImpl<>(List.of(), pageable, 0);

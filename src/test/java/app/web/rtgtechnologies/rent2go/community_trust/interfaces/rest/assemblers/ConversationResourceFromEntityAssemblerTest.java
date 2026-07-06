@@ -5,9 +5,10 @@ import app.web.rtgtechnologies.rent2go.iam.domain.model.aggregates.User;
 import app.web.rtgtechnologies.rent2go.iam.infrastructure.persistence.jpa.entities.KycApplication;
 import app.web.rtgtechnologies.rent2go.iam.infrastructure.persistence.jpa.repositories.KycApplicationRepository;
 import app.web.rtgtechnologies.rent2go.iam.infrastructure.persistence.jpa.repositories.UserRepository;
+import app.web.rtgtechnologies.rent2go.iam.interfaces.rest.assemblers.CounterpartyResourceAssembler;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -21,6 +22,11 @@ import static org.mockito.Mockito.when;
 /**
  * TS18 — verifies ConversationResourceFromEntityAssembler embeds a nested counterparty object
  * (owner/renter) alongside the existing bare ownerId/renterId fields.
+ *
+ * Sprint 5 follow-up: the actual name/KYC-join logic now lives in the shared
+ * {@link CounterpartyResourceAssembler} (extracted, single source of truth) — this test wires
+ * a real instance of it (backed by mocked repositories) rather than mocking the join logic
+ * itself, since {@code ConversationResourceFromEntityAssembler} now only delegates.
  */
 @ExtendWith(MockitoExtension.class)
 class ConversationResourceFromEntityAssemblerTest {
@@ -31,8 +37,14 @@ class ConversationResourceFromEntityAssemblerTest {
     @Mock
     private KycApplicationRepository kycApplicationRepository;
 
-    @InjectMocks
     private ConversationResourceFromEntityAssembler assembler;
+
+    @BeforeEach
+    void setUp() {
+        CounterpartyResourceAssembler counterpartyResourceAssembler =
+                new CounterpartyResourceAssembler(userRepository, kycApplicationRepository);
+        assembler = new ConversationResourceFromEntityAssembler(counterpartyResourceAssembler);
+    }
 
     @Test
     void embedsNestedCounterpartyWithFullNameAndKycStatus() {

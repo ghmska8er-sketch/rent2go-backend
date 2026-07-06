@@ -14,6 +14,8 @@ import app.web.rtgtechnologies.rent2go.vehicle_catalog.infrastructure.persistenc
 import app.web.rtgtechnologies.rent2go.vehicle_catalog.infrastructure.persistence.jpa.repositories.VehicleRepository;
 import app.web.rtgtechnologies.rent2go.vehicle_catalog.domain.model.valueobjects.VehicleStatus;
 import app.web.rtgtechnologies.rent2go.booking_reservations.infrastructure.persistence.jpa.repositories.ReservationRepository;
+import app.web.rtgtechnologies.rent2go.iam.interfaces.rest.assemblers.CounterpartyResourceAssembler;
+import app.web.rtgtechnologies.rent2go.iam.interfaces.rest.resources.CounterpartyResource;
 import app.web.rtgtechnologies.rent2go.vehicle_catalog.interfaces.rest.resources.CreateVehicleResource;
 import app.web.rtgtechnologies.rent2go.vehicle_catalog.interfaces.rest.resources.RegisterVehicleWithImageResource;
 import app.web.rtgtechnologies.rent2go.vehicle_catalog.interfaces.rest.resources.UpdateVehicleDetailsResource;
@@ -76,6 +78,7 @@ public class VehicleController {
     private final VehicleCategoryRepository vehicleCategoryRepository;
     private final VehicleRepository vehicleRepository;
     private final ReservationRepository reservationRepository;
+    private final CounterpartyResourceAssembler counterpartyResourceAssembler;
 
     /**
      * GET /api/v1/vehicles/categories
@@ -208,6 +211,43 @@ public class VehicleController {
         Vehicle vehicle = vehicleQueryService.handle(query);
         VehicleResource response = VehicleResourceFromEntityAssembler.toResource(vehicle);
         return ResponseEntity.ok(response);
+    }
+
+    /**
+     * GET /api/v1/vehicles/{id}/owner-summary
+     *
+     * US76 (Sprint 5 fixes remaining scope) — closes the pre-booking gap: the renter viewing
+     * a vehicle's detail screen before any reservation exists has no way to see the owner's
+     * name/verification status, since {@code CounterpartyResource} was previously only ever
+     * embedded post-booking inside {@code ReservationResource}/{@code ConversationResource}
+     * (both of which require an existing reservation/conversation). This is the one new
+     * public-safe read endpoint that fills that gap.
+     *
+     * Reuses the exact same {@link CounterpartyResourceAssembler} used by
+     * {@code ReservationResourceFromEntityAssembler} and
+     * {@code ConversationResourceFromEntityAssembler} — no KYC-join logic is duplicated here.
+     * Returns only the fields {@link CounterpartyResource} already exposes elsewhere
+     * (fullName, kycVerified, dniVerified, licenseVerified, profileImageUrl) — never email,
+     * phone, or any other PII, consistent with the Sprint 4/5 BRDs' PII-scoping principle.
+     *
+     * Read-only, no authentication required (mirrors GET /api/v1/vehicles/{id}, which is also
+     * public) — a prospective renter must be able to see this before any reservation exists.
+     *
+     * @return 200 with the owner's {@link CounterpartyResource} (fail-open fallback if the
+     *         owner has no KycApplication/profile photo — never an exception), or 404 if the
+     *         vehicle itself does not exist, following this controller's existing
+     *         {@code existsById(...) -> notFound()} convention (no custom exception type is
+     *         used anywhere in this codebase for 404s).
+     */
+    @GetMapping("/{id}/owner-summary")
+    @Operation(summary = "Get a vehicle's owner identity/verification summary",
+               description = "Public-safe read: returns the owner's name and verification badges (KYC/DNI/license) " +
+                             "plus profile photo, reusing the same counterparty enrichment as reservation/conversation " +
+                             "responses. Does not require an existing reservation. Returns 404 if the vehicle does not exist.")
+    public ResponseEntity<CounterpartyResource> getVehicleOwnerSummary(@PathVariable Long id) {
+        return vehicleRepository.findById(id)
+            .map(vehicle -> ResponseEntity.ok(counterpartyResourceAssembler.toCounterparty(vehicle.getOwnerId())))
+            .orElseGet(() -> ResponseEntity.notFound().build());
     }
 
     /**

@@ -99,6 +99,17 @@ public class BookingStatus extends ValueObject {
         return isCompleted() || isCancelled() || isExpired();
     }
 
+    /**
+     * Whether the rental has actually started (vehicle handed off or later),
+     * meaning there is something concrete a party could report a problem
+     * about (vehicle condition, payment, counterparty behavior). Used to gate
+     * dispute creation: PENDING/CONFIRMED bookings haven't started yet, and
+     * CANCELLED/EXPIRED never happened, so neither has a reportable incident.
+     */
+    public boolean isActiveOrLater() {
+        return isActive() || isReturnPending() || isReturnConfirmed() || isCompleted();
+    }
+
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;

@@ -4,7 +4,17 @@ import jakarta.persistence.*;
 import java.time.Instant;
 
 @Entity
-@Table(name = "kyc_applications")
+@Table(
+    name = "kyc_applications",
+    // Perf fix (2026-07-06): user_id backs findByUserIdIn(...)/findFirstByUserIdOrderByCreatedAtDesc,
+    // called for every counterparty resolved by CounterpartyResourceAssembler (reservations and
+    // vehicle owner-summary listings) and had no index. Same caveat as Reservation/Vehicle's
+    // indexes above: no Flyway/Liquibase in this project, so this annotation alone will not
+    // apply the index in production (ddl-auto=validate there) — see delivery notes.
+    indexes = {
+        @Index(name = "idx_kyc_applications_user_id", columnList = "user_id")
+    }
+)
 public class KycApplication {
 
     @Id

@@ -9,6 +9,7 @@ import jakarta.persistence.AttributeOverrides;
 import jakarta.persistence.Column;
 import jakarta.persistence.Embedded;
 import jakarta.persistence.Entity;
+import jakarta.persistence.Index;
 import jakarta.persistence.Table;
 import lombok.Builder;
 import lombok.Getter;
@@ -23,7 +24,20 @@ import java.time.LocalDateTime;
  * Represents the booking lifecycle for a rented vehicle.
  */
 @Entity
-@Table(name = "reservations")
+@Table(
+    name = "reservations",
+    // Perf fix (2026-07-06): renter_id/owner_id are the WHERE-clause columns for every
+    // reservation listing endpoint (GET /api/v1/reservations, /owner, /owner/paged,
+    // /renter/{id}/history) and had no index, forcing a full table scan per request. This
+    // project has no Flyway/Liquibase migration mechanism (src/main/resources/db/migration is
+    // empty) — schema is managed by Hibernate ddl-auto (`update` in dev, `validate` in prod
+    // per application-prod.properties). These indexes will therefore NOT be created
+    // automatically in production; see the delivery notes for the required manual DDL.
+    indexes = {
+        @Index(name = "idx_reservations_renter_id", columnList = "renter_id"),
+        @Index(name = "idx_reservations_owner_id", columnList = "owner_id")
+    }
+)
 @Getter
 @NoArgsConstructor
 public class Reservation extends AuditableAbstractAggregateRoot<Reservation> {

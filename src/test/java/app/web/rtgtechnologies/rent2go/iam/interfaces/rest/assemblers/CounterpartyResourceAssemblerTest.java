@@ -11,13 +11,20 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.Instant;
+import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.anyCollection;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
@@ -103,6 +110,53 @@ class CounterpartyResourceAssemblerTest {
         var resource = assembler.toCounterparty(1L);
 
         assertEquals("Usuario sin nombre registrado", resource.fullName());
+    }
+
+    /**
+     * Perf fix (2026-07-06): {@link CounterpartyResourceAssembler#toCounterparties(java.util.Collection)}
+     * is the batched variant that removes the N+1 previously caused by resolving each
+     * reservation-list row's renter/owner one at a time. This verifies it resolves multiple
+     * distinct user ids with exactly ONE call to each repository (never once per user id).
+     */
+    @Test
+    void toCounterparties_resolvesMultipleUsersWithOneBatchedQueryEach() {
+        User renter = mockUser(1L, "Ana Torres", true, "https://cdn/ana.jpg");
+        User owner = mockUser(2L, "Luis Ramos", false, null);
+        when(userRepository.findAllById(Set.of(1L, 2L))).thenReturn(List.of(renter, owner));
+        KycApplication approvedForRenter = new KycApplication(1L, "Ana Torres", "12345678",
+                "front.png", "back.png", "license.png", "APPROVED", Instant.now());
+        when(kycApplicationRepository.findByUserIdIn(Set.of(1L, 2L))).thenReturn(List.of(approvedForRenter));
+
+        Map<Long, app.web.rtgtechnologies.rent2go.iam.interfaces.rest.resources.CounterpartyResource> result =
+                assembler.toCounterparties(List.of(1L, 2L, 1L));
+
+        assertEquals(2, result.size());
+        assertEquals("Ana Torres", result.get(1L).fullName());
+        assertEquals(Boolean.TRUE, result.get(1L).dniVerified());
+        assertEquals("Luis Ramos", result.get(2L).fullName());
+        assertEquals(Boolean.FALSE, result.get(2L).dniVerified());
+        verify(userRepository).findAllById(anyCollection());
+        verify(kycApplicationRepository).findByUserIdIn(anyCollection());
+    }
+
+    @Test
+    void toCounterparties_withNullOrEmptyInput_returnsEmptyMapWithoutQuerying() {
+        assertTrue(assembler.toCounterparties(null).isEmpty());
+        assertTrue(assembler.toCounterparties(List.of()).isEmpty());
+        verify(userRepository, never()).findAllById(anyCollection());
+        verify(kycApplicationRepository, never()).findByUserIdIn(anyCollection());
+    }
+
+    @Test
+    void toCounterparties_userWithNoKycApplication_defaultsBadgesToFalse() {
+        User renter = mockUser(1L, "Ana Torres", false, null);
+        when(userRepository.findAllById(Set.of(1L))).thenReturn(List.of(renter));
+        when(kycApplicationRepository.findByUserIdIn(Set.of(1L))).thenReturn(List.of());
+
+        var result = assembler.toCounterparties(List.of(1L));
+
+        assertEquals(Boolean.FALSE, result.get(1L).dniVerified());
+        assertEquals(Boolean.FALSE, result.get(1L).licenseVerified());
     }
 
     private User mockUser(Long id, String fullName, boolean kycVerified, String profileImageUrl) {

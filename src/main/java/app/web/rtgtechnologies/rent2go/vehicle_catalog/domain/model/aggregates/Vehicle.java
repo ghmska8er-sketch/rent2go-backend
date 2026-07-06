@@ -24,7 +24,16 @@ import java.util.List;
  * - vehicle must have a category
  */
 @Entity
-@Table(name = "vehicles")
+@Table(
+    name = "vehicles",
+    // Perf fix (2026-07-06): owner_id backs GET /api/v1/vehicles/me's WHERE clause and had no
+    // index. Same caveat as Reservation's indexes: no Flyway/Liquibase in this project, so this
+    // annotation alone will not apply the index in production (ddl-auto=validate there) — see
+    // delivery notes for the required manual DDL.
+    indexes = {
+        @Index(name = "idx_vehicles_owner_id", columnList = "owner_id")
+    }
+)
 @Getter
 @NoArgsConstructor
 @AllArgsConstructor

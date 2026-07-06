@@ -6,11 +6,12 @@ import app.web.rtgtechnologies.rent2go.iam.domain.model.aggregates.User;
 import app.web.rtgtechnologies.rent2go.iam.infrastructure.persistence.jpa.entities.KycApplication;
 import app.web.rtgtechnologies.rent2go.iam.infrastructure.persistence.jpa.repositories.KycApplicationRepository;
 import app.web.rtgtechnologies.rent2go.iam.infrastructure.persistence.jpa.repositories.UserRepository;
+import app.web.rtgtechnologies.rent2go.iam.interfaces.rest.assemblers.CounterpartyResourceAssembler;
 import app.web.rtgtechnologies.rent2go.vehicle_catalog.domain.model.aggregates.Vehicle;
 import app.web.rtgtechnologies.rent2go.vehicle_catalog.infrastructure.persistence.jpa.repositories.VehicleRepository;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -31,6 +32,11 @@ import static org.mockito.Mockito.when;
  * Sprint 5 (US76/TS23) — extended to also cover vehicleImage and the split KYC/profile-photo
  * enrichment, including the explicit null/missing-data cases the BRD requires (no vehicle
  * image, no KycApplication record, no profile photo) — never an exception, always a fallback.
+ *
+ * Sprint 5 follow-up: the name/KYC-join logic now lives in the shared
+ * {@link CounterpartyResourceAssembler} (extracted, single source of truth) — this test wires
+ * a real instance of it (backed by mocked repositories) rather than mocking the join logic
+ * itself, since {@code ReservationResourceFromEntityAssembler} now only delegates for that part.
  */
 @ExtendWith(MockitoExtension.class)
 class ReservationResourceFromEntityAssemblerTest {
@@ -44,8 +50,14 @@ class ReservationResourceFromEntityAssemblerTest {
     @Mock
     private KycApplicationRepository kycApplicationRepository;
 
-    @InjectMocks
     private ReservationResourceFromEntityAssembler assembler;
+
+    @BeforeEach
+    void setUp() {
+        CounterpartyResourceAssembler counterpartyResourceAssembler =
+                new CounterpartyResourceAssembler(userRepository, kycApplicationRepository);
+        assembler = new ReservationResourceFromEntityAssembler(vehicleRepository, counterpartyResourceAssembler);
+    }
 
     private Reservation reservation(Long renterId, Long ownerId) {
         return Reservation.create(

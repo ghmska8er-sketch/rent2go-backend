@@ -1,7 +1,12 @@
 package app.web.rtgtechnologies.rent2go.vehicle_catalog.interfaces.rest;
 
 import app.web.rtgtechnologies.rent2go.booking_reservations.infrastructure.persistence.jpa.repositories.ReservationRepository;
+import app.web.rtgtechnologies.rent2go.iam.domain.model.aggregates.User;
+import app.web.rtgtechnologies.rent2go.iam.infrastructure.persistence.jpa.entities.KycApplication;
+import app.web.rtgtechnologies.rent2go.iam.infrastructure.persistence.jpa.repositories.KycApplicationRepository;
+import app.web.rtgtechnologies.rent2go.iam.infrastructure.persistence.jpa.repositories.UserRepository;
 import app.web.rtgtechnologies.rent2go.iam.infrastructure.services.JwtTokenProvider;
+import app.web.rtgtechnologies.rent2go.iam.interfaces.rest.assemblers.CounterpartyResourceAssembler;
 import app.web.rtgtechnologies.rent2go.shared.infrastructure.cloudinary.CloudinaryStorageService;
 import app.web.rtgtechnologies.rent2go.vehicle_catalog.domain.model.aggregates.Vehicle;
 import app.web.rtgtechnologies.rent2go.vehicle_catalog.domain.model.aggregates.VehicleCategory;
@@ -23,9 +28,13 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.util.List;
+import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
@@ -53,11 +62,15 @@ class VehicleControllerTest {
     @Mock private VehicleCategoryRepository vehicleCategoryRepository;
     @Mock private VehicleRepository vehicleRepository;
     @Mock private ReservationRepository reservationRepository;
+    @Mock private UserRepository userRepository;
+    @Mock private KycApplicationRepository kycApplicationRepository;
 
     private VehicleController controller;
 
     @BeforeEach
     void setUp() {
+        CounterpartyResourceAssembler counterpartyResourceAssembler =
+                new CounterpartyResourceAssembler(userRepository, kycApplicationRepository);
         controller = new VehicleController(
                 vehicleCommandService,
                 vehicleQueryService,
@@ -65,7 +78,8 @@ class VehicleControllerTest {
                 cloudinaryStorageService,
                 vehicleCategoryRepository,
                 vehicleRepository,
-                reservationRepository
+                reservationRepository,
+                counterpartyResourceAssembler
         );
     }
 
@@ -159,5 +173,89 @@ class VehicleControllerTest {
         assertEquals(0, response.getBody().content().size());
         assertEquals(0, response.getBody().totalElements());
         assertEquals(0, response.getBody().totalPages());
+    }
+
+    // ---- GET /api/v1/vehicles/{id}/owner-summary (US76 closure, Sprint 5 fixes remaining scope) ----
+
+    @Test
+    void getVehicleOwnerSummary_fullDataCase_returnsNameVerificationBadgesAndPhoto() {
+        Vehicle vehicle = mock(Vehicle.class);
+        when(vehicle.getOwnerId()).thenReturn(5L);
+        when(vehicleRepository.findById(10L)).thenReturn(Optional.of(vehicle));
+
+        User owner = mock(User.class);
+        when(owner.getId()).thenReturn(5L);
+        when(owner.getFullName()).thenReturn("Luis Ramos");
+        when(owner.isKycVerified()).thenReturn(true);
+        when(owner.getProfileImageUrl()).thenReturn("https://cdn/luis.jpg");
+        when(userRepository.findById(5L)).thenReturn(Optional.of(owner));
+
+        KycApplication approved = new KycApplication(5L, "Luis Ramos", "87654321",
+                "front.png", "back.png", "license.png", "APPROVED", Instant.now());
+        when(kycApplicationRepository.findFirstByUserIdOrderByCreatedAtDesc(5L))
+                .thenReturn(Optional.of(approved));
+
+        var response = controller.getVehicleOwnerSummary(10L);
+
+        assertEquals(200, response.getStatusCode().value());
+        var body = response.getBody();
+        assertEquals(5L, body.id());
+        assertEquals("Luis Ramos", body.fullName());
+        assertEquals(Boolean.TRUE, body.kycVerified());
+        assertEquals(Boolean.TRUE, body.dniVerified());
+        assertEquals(Boolean.TRUE, body.licenseVerified());
+        assertEquals("https://cdn/luis.jpg", body.profileImageUrl());
+    }
+
+    @Test
+    void getVehicleOwnerSummary_noKycApplicationCase_badgesFalse_noException() {
+        Vehicle vehicle = mock(Vehicle.class);
+        when(vehicle.getOwnerId()).thenReturn(6L);
+        when(vehicleRepository.findById(11L)).thenReturn(Optional.of(vehicle));
+
+        User owner = mock(User.class);
+        when(owner.getId()).thenReturn(6L);
+        when(owner.getFullName()).thenReturn("Owner Sin Kyc");
+        when(owner.isKycVerified()).thenReturn(false);
+        when(owner.getProfileImageUrl()).thenReturn(null);
+        when(userRepository.findById(6L)).thenReturn(Optional.of(owner));
+        when(kycApplicationRepository.findFirstByUserIdOrderByCreatedAtDesc(6L))
+                .thenReturn(Optional.empty());
+
+        var response = controller.getVehicleOwnerSummary(11L);
+
+        assertEquals(200, response.getStatusCode().value());
+        var body = response.getBody();
+        assertFalse(body.dniVerified());
+        assertFalse(body.licenseVerified());
+        assertNull(body.profileImageUrl());
+    }
+
+    @Test
+    void getVehicleOwnerSummary_vehicleNotFound_returns404() {
+        when(vehicleRepository.findById(999L)).thenReturn(Optional.empty());
+
+        var response = controller.getVehicleOwnerSummary(999L);
+
+        assertEquals(404, response.getStatusCode().value());
+    }
+
+    @Test
+    void getVehicleOwnerSummary_neverLeaksEmailOrPhone() {
+        // CounterpartyResource is a record with a fixed, closed set of components — this test
+        // asserts that set directly, so any future accidental addition of email/phone to the
+        // record is caught here rather than only being caught by an eyeball code review.
+        var componentNames = java.util.Arrays.stream(
+                        app.web.rtgtechnologies.rent2go.iam.interfaces.rest.resources.CounterpartyResource.class
+                                .getRecordComponents())
+                .map(java.lang.reflect.RecordComponent::getName)
+                .collect(java.util.stream.Collectors.toSet());
+
+        assertEquals(
+                java.util.Set.of("id", "fullName", "kycVerified", "dniVerified", "licenseVerified", "profileImageUrl"),
+                componentNames
+        );
+        assertFalse(componentNames.stream().anyMatch(n -> n.toLowerCase().contains("email")));
+        assertFalse(componentNames.stream().anyMatch(n -> n.toLowerCase().contains("phone")));
     }
 }

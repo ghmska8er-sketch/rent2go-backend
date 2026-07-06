@@ -51,12 +51,12 @@ class WithdrawalServiceTest {
 
         assertEquals(1L, withdrawal.getOwnerId());
         assertEquals(5000L, withdrawal.getAmountCents());
-        assertEquals(WithdrawalStatus.COMPLETED, withdrawal.getStatus());
+        assertEquals(WithdrawalStatus.PENDING, withdrawal.getStatus());
         assertEquals("Yape 999999999", withdrawal.getPayoutDestinationNote());
     }
 
     @Test
-    void requestWithdrawal_completesSynchronously_notPending() {
+    void requestWithdrawal_staysPending_noRealPayoutRailToConfirmIt() {
         when(paymentsService.sumSucceededAmountCentsByOwnerBetween(eq(7L), any(LocalDateTime.class), any(LocalDateTime.class)))
                 .thenReturn(10000L);
         when(withdrawalRepository.sumAmountCentsByOwner(7L)).thenReturn(0L);
@@ -64,7 +64,7 @@ class WithdrawalServiceTest {
 
         var withdrawal = service.requestWithdrawal(7L, 3000L, null);
 
-        assertEquals(WithdrawalStatus.COMPLETED, withdrawal.getStatus());
+        assertEquals(WithdrawalStatus.PENDING, withdrawal.getStatus());
     }
 
     @Test

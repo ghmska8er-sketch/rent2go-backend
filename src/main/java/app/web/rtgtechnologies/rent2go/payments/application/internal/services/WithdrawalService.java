@@ -63,9 +63,14 @@ public class WithdrawalService {
      * Requests a withdrawal for the given owner. Throws IllegalArgumentException if the
      * requested amount exceeds the owner's currently available balance.
      *
-     * Per US66 (Sprint 5), the withdrawal is transitioned to COMPLETED synchronously right
-     * after balance validation and persistence, in the same request — this remains a mock
-     * payout system with no real payout rail and no async workflow/admin step.
+     * Bugfix (Sprint 5 fixes remaining scope): withdrawals are now persisted and left in
+     * PENDING — NOT auto-marked COMPLETED — because there is no real payout rail/bank
+     * integration behind this endpoint. Auto-completing a withdrawal that never actually
+     * moved money is misleading to the owner (it reads as "you were paid" when nothing was
+     * paid) and getAvailableBalanceCents() already counts every non-rejected withdrawal
+     * against the available balance regardless of status, so leaving it PENDING does not
+     * allow double-withdrawing the same funds. A future admin-approval/payout step can
+     * transition PENDING -> COMPLETED (see Withdrawal.complete()) once real settlement exists.
      */
     public Withdrawal requestWithdrawal(Long ownerId, Long amountCents, String payoutDestinationNote) {
         if (amountCents == null || amountCents <= 0) {
@@ -76,7 +81,6 @@ public class WithdrawalService {
             throw new IllegalArgumentException("Requested amount exceeds available balance");
         }
         var withdrawal = new Withdrawal(ownerId, amountCents, payoutDestinationNote);
-        withdrawal.complete();
         return withdrawalRepository.save(withdrawal);
     }
 

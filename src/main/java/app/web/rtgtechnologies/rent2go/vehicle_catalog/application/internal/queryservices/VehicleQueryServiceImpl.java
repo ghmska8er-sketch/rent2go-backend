@@ -190,8 +190,8 @@ public class VehicleQueryServiceImpl implements VehicleQueryService {
 
         // Filter by geographic radius (Haversine formula) if provided
         if (criteria.hasRadius()) {
-            final double centerLat = Math.toRadians(criteria.getCenterLatitude());
-            final double centerLng = Math.toRadians(criteria.getCenterLongitude());
+            final double centerLat = criteria.getCenterLatitude();
+            final double centerLng = criteria.getCenterLongitude();
             final double radiusKm = criteria.getRadiusKm();
 
             results = results.stream()
@@ -202,7 +202,7 @@ public class VehicleQueryServiceImpl implements VehicleQueryService {
                         return false;
                     }
                     double distance = calculateDistanceHaversine(centerLat, centerLng,
-                        Math.toRadians(vehicleLat.doubleValue()), Math.toRadians(vehicleLng.doubleValue()));
+                        vehicleLat.doubleValue(), vehicleLng.doubleValue());
                     return distance <= radiusKm;
                 })
                 .toList();
@@ -283,8 +283,8 @@ public class VehicleQueryServiceImpl implements VehicleQueryService {
     }
 
     private List<Vehicle> filterByRadius(List<Vehicle> vehicles, SearchCriteria criteria) {
-        final double centerLat = Math.toRadians(criteria.getCenterLatitude());
-        final double centerLng = Math.toRadians(criteria.getCenterLongitude());
+        final double centerLat = criteria.getCenterLatitude();
+        final double centerLng = criteria.getCenterLongitude();
         final double radiusKm = criteria.getRadiusKm();
 
         return vehicles.stream()
@@ -295,7 +295,7 @@ public class VehicleQueryServiceImpl implements VehicleQueryService {
                     return false;
                 }
                 double distance = calculateDistanceHaversine(centerLat, centerLng,
-                    Math.toRadians(vehicleLat.doubleValue()), Math.toRadians(vehicleLng.doubleValue()));
+                    vehicleLat.doubleValue(), vehicleLng.doubleValue());
                 return distance <= radiusKm;
             })
             .toList();
@@ -311,11 +311,25 @@ public class VehicleQueryServiceImpl implements VehicleQueryService {
 
     /**
      * Calculate distance between two points using the Haversine formula.
-     * 
-     * @param lat1 Latitude of point 1 in radians
-     * @param lng1 Longitude of point 1 in radians
-     * @param lat2 Latitude of point 2 in radians
-     * @param lng2 Longitude of point 2 in radians
+     *
+     * BUGFIX (Sprint 5, geo-radius regression): this method takes DEGREES, not radians —
+     * every caller was previously pre-converting its arguments to radians via
+     * {@code Math.toRadians(...)} before calling this method, which itself calls
+     * {@code Math.toRadians(...)} again on those already-radian values. That double
+     * conversion shrinks the effective angular delta by another factor of ~57 (180/pi),
+     * so any two points genuinely ~8km apart were computed as ~0.14km apart — meaning the
+     * radius filter almost never excluded anything in realistic (single/double-digit km)
+     * searches, only at extreme (near-antipodal) distances. Fixed by removing the redundant
+     * pre-conversion at every call site and keeping this method's own, single, internal
+     * {@code Math.toRadians} conversion, so it now correctly accepts plain decimal degrees
+     * (matching {@code Vehicle.getLatitude()/getLongitude()} and
+     * {@code SearchCriteria.getCenterLatitude()/getCenterLongitude()}, which are always
+     * stored/transmitted as degrees).
+     *
+     * @param lat1 Latitude of point 1 in decimal degrees
+     * @param lng1 Longitude of point 1 in decimal degrees
+     * @param lat2 Latitude of point 2 in decimal degrees
+     * @param lng2 Longitude of point 2 in decimal degrees
      * @return Distance in kilometers
      */
     private double calculateDistanceHaversine(double lat1, double lng1, double lat2, double lng2) {

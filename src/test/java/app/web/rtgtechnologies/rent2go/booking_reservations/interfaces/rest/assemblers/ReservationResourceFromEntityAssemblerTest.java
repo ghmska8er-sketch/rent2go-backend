@@ -17,11 +17,16 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.anyCollection;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
@@ -171,6 +176,49 @@ class ReservationResourceFromEntityAssemblerTest {
         var resource = assembler.toResource(reservation(1L, 2L));
 
         assertNull(resource.renter().profileImageUrl());
+    }
+
+    /**
+     * Perf fix (2026-07-06): {@link ReservationResourceFromEntityAssembler#toResources(List)}
+     * is the batched entry point used by the reservation-listing endpoints. This verifies it
+     * resolves vehicles and counterparties for a multi-row page with exactly ONE call each to
+     * {@code vehicleRepository.findAllById}/{@code userRepository.findAllById}/
+     * {@code kycApplicationRepository.findByUserIdIn} — never once per reservation row (which
+     * was the root cause of the reported 30s-60s response times).
+     */
+    @Test
+    void toResources_batchResolvesVehiclesAndCounterpartiesWithoutPerRowQueries() {
+        Reservation r1 = reservation(1L, 2L);
+        Reservation r2 = reservation(3L, 2L);
+
+        User renter1 = mockUser(1L, "Ana Torres", true);
+        User renter2 = mockUser(3L, "Carlos Ruiz", false);
+        User owner = mockUser(2L, "Luis Ramos", false);
+        when(userRepository.findAllById(Set.of(1L, 2L, 3L))).thenReturn(List.of(renter1, renter2, owner));
+        when(kycApplicationRepository.findByUserIdIn(Set.of(1L, 2L, 3L))).thenReturn(List.of());
+
+        Vehicle vehicle = org.mockito.Mockito.mock(Vehicle.class);
+        when(vehicle.getId()).thenReturn(r1.getVehicleId());
+        when(vehicle.getPrimaryImageUrl()).thenReturn("https://cdn/vehicle.jpg");
+        when(vehicleRepository.findAllById(Set.of(r1.getVehicleId()))).thenReturn(List.of(vehicle));
+
+        List<app.web.rtgtechnologies.rent2go.booking_reservations.interfaces.rest.resources.ReservationResource> resources =
+                assembler.toResources(List.of(r1, r2));
+
+        assertEquals(2, resources.size());
+        assertEquals("Ana Torres", resources.get(0).renter().fullName());
+        assertEquals("Carlos Ruiz", resources.get(1).renter().fullName());
+        assertTrue(resources.stream().allMatch(res -> "Luis Ramos".equals(res.owner().fullName())));
+        assertEquals("https://cdn/vehicle.jpg", resources.get(0).vehicleImage());
+
+        verify(vehicleRepository).findAllById(anyCollection());
+        verify(userRepository).findAllById(anyCollection());
+        verify(kycApplicationRepository).findByUserIdIn(anyCollection());
+    }
+
+    @Test
+    void toResources_withEmptyList_returnsEmptyListWithoutQuerying() {
+        assertTrue(assembler.toResources(List.of()).isEmpty());
     }
 
     private User mockUser(Long id, String fullName, boolean kycVerified) {

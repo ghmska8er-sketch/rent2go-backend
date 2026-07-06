@@ -145,8 +145,18 @@ public class ReviewCommandServiceImpl implements ReviewCommandService {
         var reservation = reservationRepository.findById(command.reservationId())
             .orElseThrow(() -> new IllegalArgumentException("Reservation not found: " + command.reservationId()));
 
-        if (!reservation.getStatus().isCompleted()) {
-            throw new IllegalStateException("Only completed reservations can open disputes");
+        // Bugfix: this previously required the reservation to be COMPLETED,
+        // but the client's "Reportar un problema" button (report_issue_screen.dart /
+        // DisputeDialog.kt) is reachable from any reservation detail screen,
+        // including ACTIVE ones (e.g. reporting vehicle condition or payment
+        // issues during an ongoing rental) — not just after it finished. That
+        // mismatch made every non-COMPLETED submission fail with an unhandled
+        // IllegalStateException (surfaced to the client as a generic 500).
+        // Disputes now require the rental to have actually started (handoff
+        // done or later) so there is something concrete to report, without
+        // forcing the reporter to wait until the whole rental is over.
+        if (!reservation.getStatus().isActiveOrLater()) {
+            throw new IllegalStateException("Disputes can only be opened once the rental has started");
         }
 
         if (!reservation.getRenterId().equals(command.reporterId()) && !reservation.getOwnerId().equals(command.reporterId())) {

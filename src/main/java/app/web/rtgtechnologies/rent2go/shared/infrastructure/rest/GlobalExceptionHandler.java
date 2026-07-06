@@ -100,6 +100,20 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         return ResponseEntity.badRequest().body(body);
     }
 
+    // Bugfix (dispute creation 500s): domain rule violations such as "dispute
+    // requires the rental to have started" throw IllegalStateException, which
+    // previously had no dedicated handler and fell through to the generic
+    // Exception handler below, returning an opaque 500 "Internal server
+    // error" with no indication of what went wrong. Mapped to 409 Conflict
+    // (the request is well-formed but the resource's current state doesn't
+    // allow the operation) with the actual rule message.
+    @ExceptionHandler(IllegalStateException.class)
+    public ResponseEntity<Object> handleIllegalState(IllegalStateException ex) {
+        Map<String, String> body = new HashMap<>();
+        body.put("error", ex.getMessage());
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(body);
+    }
+
     @ExceptionHandler(Exception.class)
     public ResponseEntity<Object> handleAll(Exception ex) {
         Map<String, String> body = new HashMap<>();

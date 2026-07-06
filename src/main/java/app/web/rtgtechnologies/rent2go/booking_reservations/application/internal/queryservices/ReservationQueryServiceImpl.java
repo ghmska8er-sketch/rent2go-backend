@@ -66,4 +66,13 @@ public class ReservationQueryServiceImpl implements ReservationQueryService {
 
         return reservationRepository.findAllByOwnerIdAndStatus_Status(query.ownerId(), query.status(), p);
     }
+
+    @Override
+    public java.util.List<Reservation> handleRenterListPrioritized(GetReservationsByRenterQuery query) {
+        if (query.status() == null || query.status().isBlank()) {
+            return reservationRepository.findAllByRenterIdOrderByPriorityThenStartDateDesc(query.renterId());
+        }
+
+        return reservationRepository.findAllByRenterIdAndStatus_StatusOrderByPriorityThenStartDateDesc(query.renterId(), query.status());
+    }
 }

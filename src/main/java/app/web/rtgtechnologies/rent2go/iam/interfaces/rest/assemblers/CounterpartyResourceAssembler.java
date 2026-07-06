@@ -1,11 +1,21 @@
 package app.web.rtgtechnologies.rent2go.iam.interfaces.rest.assemblers;
 
 import app.web.rtgtechnologies.rent2go.iam.domain.model.aggregates.User;
+import app.web.rtgtechnologies.rent2go.iam.infrastructure.persistence.jpa.entities.KycApplication;
 import app.web.rtgtechnologies.rent2go.iam.infrastructure.persistence.jpa.repositories.KycApplicationRepository;
 import app.web.rtgtechnologies.rent2go.iam.infrastructure.persistence.jpa.repositories.UserRepository;
 import app.web.rtgtechnologies.rent2go.iam.interfaces.rest.resources.CounterpartyResource;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
+
+import java.util.Collection;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
  * CounterpartyResourceAssembler
@@ -52,22 +62,64 @@ public class CounterpartyResourceAssembler {
             return null;
         }
         return userRepository.findById(userId)
-            .map(this::toCounterpartyResource)
+            .map(user -> toCounterpartyResource(user, isKycApplicationApproved(user.getId())))
             .orElse(new CounterpartyResource(userId, NO_NAME_ON_FILE, false, false, false, null));
     }
 
-    private CounterpartyResource toCounterpartyResource(User user) {
+    /**
+     * Perf fix (2026-07-06): batched counterpart of {@link #toCounterparty(Long)}, resolving
+     * every distinct user id in {@code userIds} with exactly 2 queries total
+     * ({@code userRepository.findAllById} + {@code kycApplicationRepository.findByUserIdIn})
+     * instead of 2 queries PER user id. Used by list endpoints (e.g. GET /api/v1/reservations)
+     * that previously enriched each row's renter and owner one at a time, multiplying the
+     * per-row query count and dominating response time on paginated listings.
+     *
+     * @param userIds user ids to resolve; nulls and duplicates are ignored/deduplicated.
+     * @return a map keyed by userId; missing users are NOT included (callers should fall back
+     *         to a "no name on file" resource for absent keys, matching
+     *         {@link #toCounterparty(Long)}'s fail-open behavior).
+     */
+    public Map<Long, CounterpartyResource> toCounterparties(Collection<Long> userIds) {
+        Set<Long> distinctIds = userIds == null ? Set.of() : userIds.stream()
+            .filter(java.util.Objects::nonNull)
+            .collect(Collectors.toSet());
+
+        if (distinctIds.isEmpty()) {
+            return Map.of();
+        }
+
+        // Single batched query, then reduce to "most recent application per user" in memory —
+        // mirroring findFirstByUserIdOrderByCreatedAtDesc's single-user semantics, but for the
+        // whole page at once.
+        Map<Long, List<KycApplication>> appsByUserId = kycApplicationRepository.findByUserIdIn(distinctIds).stream()
+            .collect(Collectors.groupingBy(KycApplication::getUserId));
+
+        Map<Long, Boolean> approvedByUserId = new HashMap<>();
+        for (var entry : appsByUserId.entrySet()) {
+            entry.getValue().stream()
+                .max(Comparator.comparing(KycApplication::getCreatedAt))
+                .ifPresent(mostRecent -> approvedByUserId.put(entry.getKey(), KYC_APPROVED.equalsIgnoreCase(mostRecent.getStatus())));
+        }
+
+        Map<Long, CounterpartyResource> result = new LinkedHashMap<>();
+        for (User user : userRepository.findAllById(distinctIds)) {
+            boolean verified = approvedByUserId.getOrDefault(user.getId(), false);
+            result.put(user.getId(), toCounterpartyResource(user, verified));
+        }
+        return result;
+    }
+
+    private CounterpartyResource toCounterpartyResource(User user, boolean kycApplicationApproved) {
         String fullName = user.getFullName();
         if (fullName == null || fullName.isBlank()) {
             fullName = NO_NAME_ON_FILE;
         }
-        boolean verified = isKycApplicationApproved(user.getId());
         return new CounterpartyResource(
             user.getId(),
             fullName,
             user.isKycVerified(),
-            verified,
-            verified,
+            kycApplicationApproved,
+            kycApplicationApproved,
             user.getProfileImageUrl()
         );
     }

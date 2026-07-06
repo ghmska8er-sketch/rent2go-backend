@@ -32,7 +32,6 @@ import org.springframework.validation.annotation.Validated;
 import java.net.URI;
 import java.util.List;
 import java.util.Optional;
-import java.util.function.Function;
 
 @Tag(name = "Booking & Reservations", description = "Reservation lifecycle operations and renter/owner views")
 @RestController
@@ -156,16 +155,30 @@ public class ReservationController {
         return ResponseEntity.ok(resourceAssembler.toResource(updated));
     }
 
+    /**
+     * Perf fix (2026-07-06), revised per product requirement: NO pagination — returns the
+     * renter's FULL reservation list in one indexed query, sorted with non-terminal
+     * reservations (PENDING/CONFIRMED/ACTIVE/RETURN_PENDING/RETURN_CONFIRMED) before terminal
+     * ones (COMPLETED/CANCELLED/EXPIRED), most recent start date first within each group. The
+     * {@code page}/{@code size} query params are intentionally no longer part of this
+     * endpoint's contract (removed, not just ignored) per the explicit requirement that older
+     * reservations must never visually outrank more relevant ones due to page slicing.
+     * {@code PagedResponse}'s envelope shape is kept for response-body backward compatibility
+     * with existing clients (Flutter/Kotlin) that read {@code .content} — {@code page}/{@code size}/
+     * {@code totalPages} are now fixed values (1/total-count/1) rather than meaningful pagination
+     * state. See ReservationRepository.findAllByRenterIdOrderByPriorityThenStartDateDesc for the
+     * single-query implementation (avoids the N+1 fixed separately in
+     * ReservationResourceFromEntityAssembler).
+     */
     @GetMapping
-    @Operation(summary = "List renter reservations", description = "Returns the renter's reservations, optionally filtered by status. Page starts at 1.")
+    @Operation(summary = "List renter reservations", description = "Returns ALL of the renter's reservations (no pagination), optionally filtered by status. Non-terminal reservations (pending/confirmed/active/return in progress) are returned before terminal ones (completed/cancelled/expired), most recent first within each group.")
     public ResponseEntity<PagedResponse<ReservationResource>> listByRenter(
             @RequestParam @Positive(message = "Renter ID must be positive") Long renterId,
-            @RequestParam(required = false) String status,
-            @RequestParam(defaultValue = "1") @Min(value = 1, message = "Page must be greater than or equal to 1") int page,
-            @RequestParam(defaultValue = "20") @Min(value = 1, message = "Size must be greater than 0") @Max(value = 100, message = "Size must be at most 100") int size
+            @RequestParam(required = false) String status
     ) {
-        var results = queryService.handle(new app.web.rtgtechnologies.rent2go.booking_reservations.domain.model.queries.GetReservationsByRenterQuery(renterId, status));
-        return ResponseEntity.ok(toPagedResponse(results, page, size, resourceAssembler::toResource));
+        var results = queryService.handleRenterListPrioritized(new app.web.rtgtechnologies.rent2go.booking_reservations.domain.model.queries.GetReservationsByRenterQuery(renterId, status));
+        List<ReservationResource> content = resourceAssembler.toResources(results);
+        return ResponseEntity.ok(new PagedResponse<>(content, 1, content.size(), content.size(), content.isEmpty() ? 0 : 1));
     }
 
     @GetMapping("/owner")
@@ -176,8 +189,9 @@ public class ReservationController {
             @RequestParam(defaultValue = "1") @Min(value = 1, message = "Page must be greater than or equal to 1") int page,
             @RequestParam(defaultValue = "20") @Min(value = 1, message = "Size must be greater than 0") @Max(value = 100, message = "Size must be at most 100") int size
     ) {
-        var results = queryService.handle(new app.web.rtgtechnologies.rent2go.booking_reservations.domain.model.queries.GetReservationsByOwnerQuery(ownerId, status));
-        return ResponseEntity.ok(toPagedResponse(results, page, size, resourceAssembler::toResource));
+        // Perf fix (2026-07-06): same DB-level pagination fix as listByRenter above.
+        var results = queryService.handle(new app.web.rtgtechnologies.rent2go.booking_reservations.domain.model.queries.GetReservationsByOwnerPagedQuery(ownerId, status, page, size));
+        return ResponseEntity.ok(toPagedResponse(results, page));
     }
 
     @GetMapping("/renter/{renterId}/history")
@@ -187,8 +201,12 @@ public class ReservationController {
             @RequestParam(defaultValue = "1") @Min(value = 1, message = "Page must be greater than or equal to 1") int page,
             @RequestParam(defaultValue = "20") @Min(value = 1, message = "Size must be greater than 0") @Max(value = 100, message = "Size must be at most 100") int size
     ) {
-        var results = queryService.handle(new app.web.rtgtechnologies.rent2go.booking_reservations.domain.model.queries.GetReservationHistoryByRenterQuery(renterId));
-        return ResponseEntity.ok(toPagedResponse(results, page, size, resourceAssembler::toResource));
+        // Out of the renter-listing scope changed above (this endpoint is COMPLETED-only, so
+        // there is no "non-terminal vs terminal" priority to preserve). Kept paginated as
+        // before, but now uses the batched resourceAssembler.toResources(...) so the page's
+        // counterparty/vehicle enrichment still avoids the N+1 fixed in this same change.
+        var allHistory = queryService.handle(new app.web.rtgtechnologies.rent2go.booking_reservations.domain.model.queries.GetReservationHistoryByRenterQuery(renterId));
+        return ResponseEntity.ok(toPagedResponseInMemory(allHistory, page, size));
     }
 
     @GetMapping("/owner/paged")
@@ -200,17 +218,37 @@ public class ReservationController {
             @RequestParam(defaultValue = "20") @Min(value = 1, message = "Size must be greater than 0") @Max(value = 100, message = "Size must be at most 100") int size
     ) {
         var results = queryService.handle(new app.web.rtgtechnologies.rent2go.booking_reservations.domain.model.queries.GetReservationsByOwnerPagedQuery(ownerId, status, page, size));
-        var content = results.getContent().stream().map(resourceAssembler::toResource).toList();
-        return ResponseEntity.ok(new PagedResponse<>(content, results.getNumber(), results.getSize(), results.getTotalElements(), results.getTotalPages()));
+        return ResponseEntity.ok(toPagedResponse(results, page));
     }
 
-    private <T, R> PagedResponse<R> toPagedResponse(List<T> source, int page, int size, Function<T, R> mapper) {
+    /**
+     * Perf fix (2026-07-06): builds the response from a real {@link Page} (DB-computed
+     * totalElements/totalPages) using {@link ReservationResourceFromEntityAssembler#toResources}
+     * so the whole page's counterparty/vehicle enrichment happens in a fixed 3 queries total,
+     * instead of up to 5 queries per row.
+     */
+    private PagedResponse<ReservationResource> toPagedResponse(org.springframework.data.domain.Page<Reservation> source, int page) {
+        int safePage = Math.max(1, page);
+        List<ReservationResource> content = resourceAssembler.toResources(source.getContent());
+        return new PagedResponse<>(content, safePage, source.getSize(), source.getTotalElements(), source.getTotalPages());
+    }
+
+    /**
+     * In-memory slicing helper, retained only for GET /renter/{renterId}/history (a
+     * COMPLETED-only, not-in-scope-for-the-no-pagination-requirement endpoint). Uses the
+     * batched {@link ReservationResourceFromEntityAssembler#toResources(List)} on just the
+     * sliced page, not the full source list, so this endpoint still avoids the N+1 fixed
+     * elsewhere in this change even though it still loads the renter's full completed history
+     * before slicing (acceptable here since COMPLETED-only history is typically much smaller
+     * than the full mixed-status list GET /api/v1/reservations used to load).
+     */
+    private PagedResponse<ReservationResource> toPagedResponseInMemory(List<Reservation> source, int page, int size) {
         int safePage = Math.max(1, page);
         int safeSize = Math.max(1, size);
         long totalElements = source.size();
         int fromIndex = Math.min((safePage - 1) * safeSize, source.size());
         int toIndex = Math.min(fromIndex + safeSize, source.size());
-        List<R> content = source.subList(fromIndex, toIndex).stream().map(mapper).toList();
+        List<ReservationResource> content = resourceAssembler.toResources(source.subList(fromIndex, toIndex));
         int totalPages = totalElements == 0 ? 0 : (int) Math.ceil((double) totalElements / safeSize);
         return new PagedResponse<>(content, safePage, safeSize, totalElements, totalPages);
     }

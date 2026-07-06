@@ -26,4 +26,14 @@ public interface ReservationQueryService {
     List<Reservation> handle(app.web.rtgtechnologies.rent2go.booking_reservations.domain.model.queries.GetReservationHistoryByRenterQuery query);
 
     org.springframework.data.domain.Page<Reservation> handle(app.web.rtgtechnologies.rent2go.booking_reservations.domain.model.queries.GetReservationsByOwnerPagedQuery query);
+
+    /**
+     * Perf fix (2026-07-06), revised per product requirement: returns the renter's FULL
+     * reservation list (no pagination), sorted with non-terminal reservations
+     * (PENDING/CONFIRMED/ACTIVE/RETURN_PENDING/RETURN_CONFIRMED) before terminal ones
+     * (COMPLETED/CANCELLED/EXPIRED), most recent start date first within each group. Backs
+     * GET /api/v1/reservations. See {@code ReservationRepository.findAllByRenterIdOrderByPriorityThenStartDateDesc}
+     * for the single-query implementation.
+     */
+    List<Reservation> handleRenterListPrioritized(GetReservationsByRenterQuery query);
 }

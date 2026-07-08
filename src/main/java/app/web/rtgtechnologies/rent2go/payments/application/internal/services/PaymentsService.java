@@ -19,10 +19,27 @@ public class PaymentsService {
         this.paymentRepository = paymentRepository;
     }
 
-    public Payment createRecord(Long reservationId, String paymentIntentId, Long amountCents, String currency) {
-        var p = new Payment(reservationId, paymentIntentId, amountCents, currency, "CREATED");
-        return paymentRepository.save(p);
+public Payment createRecord(Long reservationId,
+                            String paymentIntentId,
+                            Long amountCents,
+                            String currency) {
+
+    var existing = paymentRepository.findByPaymentIntentId(paymentIntentId);
+
+    if (existing.isPresent()) {
+        return existing.get();
     }
+
+    var payment = new Payment(
+            reservationId,
+            paymentIntentId,
+            amountCents,
+            currency,
+            "CREATED"
+    );
+
+    return paymentRepository.save(payment);
+}
 
     public Optional<Payment> findByReservationId(Long reservationId) {
         return paymentRepository.findByReservationId(reservationId);

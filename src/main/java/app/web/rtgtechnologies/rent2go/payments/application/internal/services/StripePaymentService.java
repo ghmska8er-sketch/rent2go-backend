@@ -223,10 +223,11 @@ public class StripePaymentService {
         return r.getId();
     }
 
-    public String createCheckoutSession(
+    public Session createCheckoutSession(
             Long reservationId,
             Long amountCents,
             String currency) throws StripeException {
+        Stripe.apiKey = stripeSecretKey;
 
         SessionCreateParams params =
                 SessionCreateParams.builder()
@@ -235,6 +236,10 @@ public class StripePaymentService {
                                 "https://rent2go-fe7ed.web.app/#/bookings")
                         .setCancelUrl(
                                 "https://rent2go-fe7ed.web.app/#/bookings")
+                        .setPaymentIntentData(
+                                SessionCreateParams.PaymentIntentData.builder()
+                                        .putMetadata("reservationId", String.valueOf(reservationId))
+                                        .build())
                         .addLineItem(
                                 SessionCreateParams.LineItem.builder()
                                         .setQuantity(1L)
@@ -250,8 +255,6 @@ public class StripePaymentService {
                                         .build())
                         .build();
 
-        Session session = Session.create(params);
-
-        return session.getUrl();
+        return Session.create(params);
     }
 }

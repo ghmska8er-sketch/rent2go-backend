@@ -88,7 +88,8 @@ public class WebSecurityConfiguration {
                         "/api/v1/auth/password/reset",
                         "/api/v1/auth/verify",
                         "/api/v1/payments/calculate",
-                        "/api/v1/payments/webhook").permitAll()
+                        "/api/v1/payments/webhook",
+                        "/api/v1/create-checkout-session").permitAll()
                     .requestMatchers(HttpMethod.GET,
                         "/api/v1/vehicles/me").authenticated()
                     .requestMatchers(HttpMethod.GET,

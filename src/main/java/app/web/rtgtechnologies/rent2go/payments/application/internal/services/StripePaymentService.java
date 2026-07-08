@@ -232,9 +232,9 @@ public class StripePaymentService {
                 SessionCreateParams.builder()
                         .setMode(SessionCreateParams.Mode.PAYMENT)
                         .setSuccessUrl(
-                                "https://rent2go-backend-production.up.railway.app/payment-success?reservationId=" + reservationId)
+                                "https://rent2go-backend-production.up.railway.app/#/payment-success?reservationId=" + reservationId)
                         .setCancelUrl(
-                                "https://rent2go-backend-production.up.railway.app/payment-cancel?reservationId=" + reservationId)
+                                "https://rent2go-backend-production.up.railway.app/#/payment-cancel?reservationId=" + reservationId)
                         .addLineItem(
                                 SessionCreateParams.LineItem.builder()
                                         .setQuantity(1L)

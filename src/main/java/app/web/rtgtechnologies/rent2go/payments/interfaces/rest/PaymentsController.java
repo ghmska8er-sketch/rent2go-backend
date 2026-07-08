@@ -38,6 +38,7 @@ import com.stripe.exception.StripeException;
 import app.web.rtgtechnologies.rent2go.payments.interfaces.rest.resources.CreateIntentRequest;
 import app.web.rtgtechnologies.rent2go.payments.interfaces.rest.resources.CreateIntentResponse;
 import app.web.rtgtechnologies.rent2go.payments.interfaces.rest.resources.CheckoutSessionResponse;
+import com.stripe.model.checkout.Session;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.http.HttpStatus;
@@ -202,14 +203,22 @@ public class PaymentsController {
             @Valid @RequestBody CreateIntentRequest request) {
 
         try {
-            String url = stripePaymentService.createCheckoutSession(
+            Session session = stripePaymentService.createCheckoutSession(
                     request.getReservationId(),
                     request.getAmountCents(),
                     request.getCurrency());
 
-            return ResponseEntity.ok(new CheckoutSessionResponse(url));
+            String paymentIntentId = session.getPaymentIntent();
+            if (paymentIntentId == null || paymentIntentId.isBlank()) {
+                log.error("Stripe checkout session created without payment intent for reservationId={}", request.getReservationId());
+                return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+            }
+
+            paymentsService.createRecord(request.getReservationId(), paymentIntentId, request.getAmountCents(), request.getCurrency());
+            return ResponseEntity.ok(new CheckoutSessionResponse(session.getUrl()));
 
         } catch (StripeException e) {
+            log.error("Stripe rejected create-checkout-session for reservationId={}: {}", request.getReservationId(), e.getMessage(), e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
         }
     }

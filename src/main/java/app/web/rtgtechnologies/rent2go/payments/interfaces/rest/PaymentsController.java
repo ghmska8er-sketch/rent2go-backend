@@ -37,6 +37,7 @@ import java.util.stream.Collectors;
 import com.stripe.exception.StripeException;
 import app.web.rtgtechnologies.rent2go.payments.interfaces.rest.resources.CreateIntentRequest;
 import app.web.rtgtechnologies.rent2go.payments.interfaces.rest.resources.CreateIntentResponse;
+import app.web.rtgtechnologies.rent2go.payments.interfaces.rest.resources.CheckoutSessionResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.http.HttpStatus;
@@ -191,6 +192,24 @@ public class PaymentsController {
             return ResponseEntity.ok(new CreateIntentResponse((String) map.get("clientSecret"), (String) map.get("id")));
         } catch (StripeException e) {
             log.error("Stripe rejected create-intent for reservationId={}: {}", request.getReservationId(), e.getMessage(), e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
+    }
+
+    @PostMapping("/create-checkout-session")
+    @PreAuthorize("hasRole('USER')")
+    public ResponseEntity<CheckoutSessionResponse> createCheckoutSession(
+            @Valid @RequestBody CreateIntentRequest request) {
+
+        try {
+            String url = stripePaymentService.createCheckoutSession(
+                    request.getReservationId(),
+                    request.getAmountCents(),
+                    request.getCurrency());
+
+            return ResponseEntity.ok(new CheckoutSessionResponse(url));
+
+        } catch (StripeException e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
         }
     }

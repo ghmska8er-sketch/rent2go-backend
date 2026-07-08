@@ -16,6 +16,9 @@ import app.web.rtgtechnologies.rent2go.booking_reservations.infrastructure.persi
 import app.web.rtgtechnologies.rent2go.booking_reservations.infrastructure.persistence.jpa.repositories.VehicleAvailabilityRepository;
 import app.web.rtgtechnologies.rent2go.booking_reservations.domain.model.aggregates.VehicleAvailability;
 import app.web.rtgtechnologies.rent2go.booking_reservations.domain.model.valueobjects.DateRange;
+import com.stripe.exception.StripeException;
+import com.stripe.model.checkout.Session;
+import com.stripe.param.checkout.SessionCreateParams;
 
 import java.util.Optional;
 import java.util.HashMap;
@@ -218,5 +221,37 @@ public class StripePaymentService {
         b.setPaymentIntent(paymentIntentId);
         com.stripe.model.Refund r = com.stripe.model.Refund.create(b.build());
         return r.getId();
+    }
+
+    public String createCheckoutSession(
+            Long reservationId,
+            Long amountCents,
+            String currency) throws StripeException {
+
+        SessionCreateParams params =
+                SessionCreateParams.builder()
+                        .setMode(SessionCreateParams.Mode.PAYMENT)
+                        .setSuccessUrl(
+                                "https://rent2go-backend-production.up.railway.app/payment-success?reservationId=" + reservationId)
+                        .setCancelUrl(
+                                "https://rent2go-backend-production.up.railway.app/payment-cancel?reservationId=" + reservationId)
+                        .addLineItem(
+                                SessionCreateParams.LineItem.builder()
+                                        .setQuantity(1L)
+                                        .setPriceData(
+                                                SessionCreateParams.LineItem.PriceData.builder()
+                                                        .setCurrency(currency)
+                                                        .setUnitAmount(amountCents)
+                                                        .setProductData(
+                                                                SessionCreateParams.LineItem.PriceData.ProductData.builder()
+                                                                        .setName("Rent2Go Reservation")
+                                                                        .build())
+                                                        .build())
+                                        .build())
+                        .build();
+
+        Session session = Session.create(params);
+
+        return session.getUrl();
     }
 }

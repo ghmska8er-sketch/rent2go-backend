@@ -202,26 +202,40 @@ public class PaymentsController {
     public ResponseEntity<CheckoutSessionResponse> createCheckoutSession(
             @Valid @RequestBody CreateIntentRequest request) {
 
+        log.info("POST create-checkout-session: reservationId={}, amountCents={}, currency={}",
+                request.getReservationId(),
+                request.getAmountCents(),
+                request.getCurrency());
+
         try {
+
             Session session = stripePaymentService.createCheckoutSession(
                     request.getReservationId(),
                     request.getAmountCents(),
                     request.getCurrency());
 
-            String paymentIntentId = session.getPaymentIntent();
-            if (paymentIntentId == null || paymentIntentId.isBlank()) {
-                log.error("Stripe checkout session created without payment intent for reservationId={}", request.getReservationId());
-                return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
-            }
+            log.info("Checkout Session created successfully. sessionId={}, paymentIntent={}",
+                    session.getId(),
+                    session.getPaymentIntent());
 
-            paymentsService.createRecord(request.getReservationId(), paymentIntentId, request.getAmountCents(), request.getCurrency());
-            return ResponseEntity.ok(new CheckoutSessionResponse(session.getUrl()));
+            // NO guardar Payment aquí.
+            // El PaymentIntent todavía puede no existir.
+            // Se registrará cuando Stripe envíe payment_intent.succeeded.
+
+            return ResponseEntity.ok(
+                    new CheckoutSessionResponse(session.getUrl()));
 
         } catch (StripeException e) {
-            log.error("Stripe rejected create-checkout-session for reservationId={}: {}", request.getReservationId(), e.getMessage(), e);
+
+            log.error("Stripe rejected create-checkout-session for reservationId={}: {}",
+                    request.getReservationId(),
+                    e.getMessage(),
+                    e);
+
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
         }
     }
+
 
     @PostMapping(value = "/webhook", consumes = MediaType.APPLICATION_JSON_VALUE)
     @Operation(summary = "Stripe webhook", description = "Receives Stripe events and synchronizes payment status in the backend.")

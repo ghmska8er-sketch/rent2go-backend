@@ -7,6 +7,7 @@ import com.stripe.model.Event;
 import com.stripe.model.PaymentIntent;
 import com.stripe.net.Webhook;
 import com.stripe.param.PaymentIntentCreateParams;
+import com.stripe.param.checkout.SessionRetrieveParams;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -16,12 +17,12 @@ import app.web.rtgtechnologies.rent2go.booking_reservations.infrastructure.persi
 import app.web.rtgtechnologies.rent2go.booking_reservations.infrastructure.persistence.jpa.repositories.VehicleAvailabilityRepository;
 import app.web.rtgtechnologies.rent2go.booking_reservations.domain.model.aggregates.VehicleAvailability;
 import app.web.rtgtechnologies.rent2go.booking_reservations.domain.model.valueobjects.DateRange;
-import com.stripe.exception.StripeException;
 import com.stripe.model.checkout.Session;
 import com.stripe.param.checkout.SessionCreateParams;
 
 import java.util.Optional;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 @Service
@@ -62,6 +63,19 @@ public class StripePaymentService {
         resp.put("clientSecret", intent.getClientSecret());
         resp.put("id", intent.getId());
         return resp;
+    }
+
+    private static final long MINIMUM_AMOUNT_CENTS_PEN = 100;
+
+    private void validateCheckoutAmount(Long amountCents, String currency) {
+        if (amountCents == null || amountCents <= 0) {
+            throw new IllegalArgumentException("Amount in cents must be positive.");
+        }
+        if ("PEN".equalsIgnoreCase(currency) && amountCents < MINIMUM_AMOUNT_CENTS_PEN) {
+            throw new IllegalArgumentException(
+                    "Minimum amount for PEN is " + MINIMUM_AMOUNT_CENTS_PEN + " cents (1.00 PEN)."
+            );
+        }
     }
 
     public Event constructEvent(String payload, String sigHeader) throws SignatureVerificationException {
@@ -165,7 +179,29 @@ public class StripePaymentService {
         // Mark the Payment record succeeded in the same place/transaction as the reservation
         // update, using the exact same (safely-deserialized) intent id — eliminates the previous
         // duplicate, independent deserialization that used to live in PaymentsController.webhook().
-        paymentsService.markSucceeded(intent.getId());
+        
+        //paymentsService.markSucceeded(intent.getId());
+        var paymentOpt = paymentsService.findByPaymentIntentId(intent.getId());
+
+        if (paymentOpt.isPresent()) {
+
+            paymentsService.markSucceeded(intent.getId());
+
+        } else {
+
+            paymentsService.createRecord(
+                    reservationId,
+                    intent.getId(),
+                    intent.getAmount(),
+                    intent.getCurrency().toUpperCase()
+            );
+
+            paymentsService.markSucceeded(intent.getId());
+
+            log.info("Payment record created from webhook. reservationId={}, paymentIntentId={}",
+                    reservationId,
+                    intent.getId());
+        }
     }
 
     /**
@@ -228,6 +264,7 @@ public class StripePaymentService {
             Long amountCents,
             String currency) throws StripeException {
         Stripe.apiKey = stripeSecretKey;
+        validateCheckoutAmount(amountCents, currency);
 
         SessionCreateParams params =
                 SessionCreateParams.builder()
@@ -255,6 +292,16 @@ public class StripePaymentService {
                                         .build())
                         .build();
 
-        return Session.create(params);
+        Session session = Session.create(params);
+        if (session.getPaymentIntent() == null && session.getId() != null) {
+            log.warn("Checkout session created without payment_intent; retrieving expanded session for id={}", session.getId());
+            session = Session.retrieve(
+                    session.getId(),
+                    SessionRetrieveParams.builder()
+                            .addExpand("payment_intent")
+                            .build(),
+                    null);
+        }
+        return session;
     }
 }
